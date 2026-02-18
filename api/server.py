@@ -182,9 +182,10 @@ async def refresh_accuracy():
     """Force recompute of accuracy metrics (clears cache)."""
     if predictor is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
-    predictor._accuracy_cache = None
-    predictor._accuracy_cache_time = None
-    return predictor.get_historical_accuracy()
+    # Trigger background re-validation (non-blocking)
+    predictor._accuracy_cache_time = None      # mark stale
+    predictor._launch_bg_validation()          # kick off bg thread
+    return predictor.get_historical_accuracy() # return current cache instantly
 
 
 @app.get("/api/data/realtime")
