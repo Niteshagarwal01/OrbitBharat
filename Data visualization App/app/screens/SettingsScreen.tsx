@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Alert, StatusBar, Image, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, User, Bell, Shield, Info, LogOut, ChevronRight, Mail, Github, Globe, Sun } from 'lucide-react-native';
-import { BlurView } from 'expo-blur';
+import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { APP_CONFIG } from '../utils/constants';
 import { useSafeAuth as useAuth, useSafeUser as useUser } from '../utils/useClerkSafe';
@@ -61,20 +61,20 @@ export default function SettingsScreen({ navigation }: any) {
 
                 <ScrollView contentContainerStyle={styles.content}>
                     {/* Header */}
-                    <BlurView intensity={20} tint="dark" style={styles.header}>
+                    <GlassCard style={styles.header}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                             <ArrowLeft size={24} color="#FFF" />
                         </TouchableOpacity>
                         <Text style={styles.headerTitle}>System Settings</Text>
                         <View style={{ width: 40 }} />
-                    </BlurView>
+                    </GlassCard>
 
 
                     {/* Profile Card */}
                     <View style={styles.section}>
                         <Text style={styles.sectionHeader}>COMMANDER PROFILE</Text>
                         <View style={styles.cardWrapper}>
-                            <BlurView intensity={20} tint="dark" style={styles.profileCard}>
+                            <GlassCard style={styles.profileCard}>
                                 <View style={styles.profileHeader}>
                                     <View style={styles.avatarContainer}>
                                         {user?.imageUrl ? (
@@ -102,7 +102,7 @@ export default function SettingsScreen({ navigation }: any) {
                                 ) : (
                                     <Text style={styles.syncedText}>✓ Neural Link Active • Settings Synced</Text>
                                 )}
-                            </BlurView>
+                            </GlassCard>
                         </View>
                     </View>
 
@@ -110,7 +110,7 @@ export default function SettingsScreen({ navigation }: any) {
                     <View style={styles.section}>
                         <Text style={styles.sectionHeader}>ALERT PROTOCOLS</Text>
                         <View style={styles.cardWrapper}>
-                            <BlurView intensity={20} tint="dark" style={styles.settingsCard}>
+                            <GlassCard style={styles.settingsCard}>
                                 <SettingRow
                                     icon={Shield}
                                     title="CME Impact Alerts"
@@ -140,7 +140,7 @@ export default function SettingsScreen({ navigation }: any) {
                                     isSwitch
                                     color={APP_CONFIG.colors.success}
                                 />
-                            </BlurView>
+                            </GlassCard>
                         </View>
                     </View>
 
@@ -148,7 +148,7 @@ export default function SettingsScreen({ navigation }: any) {
                     <View style={styles.section}>
                         <Text style={styles.sectionHeader}>SYSTEM INFORMATION</Text>
                         <View style={styles.cardWrapper}>
-                            <BlurView intensity={20} tint="dark" style={styles.settingsCard}>
+                            <GlassCard style={styles.settingsCard}>
                                 <SettingRow
                                     icon={Info}
                                     title="Mission Version"
@@ -172,7 +172,7 @@ export default function SettingsScreen({ navigation }: any) {
                                     onPress={() => Linking.openURL('mailto:musicniteshagarwal@gmail.com')}
                                     color={APP_CONFIG.colors.info}
                                 />
-                            </BlurView>
+                            </GlassCard>
                         </View>
                     </View>
 

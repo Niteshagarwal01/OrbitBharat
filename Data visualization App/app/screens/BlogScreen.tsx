@@ -31,7 +31,7 @@ import {
   BookOpen
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
+import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { APP_CONFIG } from '../utils/constants';
 import { logger } from '../utils/logger';
@@ -150,7 +150,7 @@ export default function BlogScreen({ navigation }: Props) {
             </View>
           </View>
 
-          <BlurView intensity={20} tint="dark" style={styles.cardContent}>
+          <GlassCard style={styles.cardContent}>
             <Text style={styles.cardTitle} numberOfLines={2}>{article.title}</Text>
             <Text style={styles.cardSummary} numberOfLines={2}>{article.summary}</Text>
 
@@ -168,7 +168,7 @@ export default function BlogScreen({ navigation }: Props) {
                 </TouchableOpacity>
               </View>
             </View>
-          </BlurView>
+          </GlassCard>
         </TouchableOpacity>
       </Animated.View>
     );
@@ -195,7 +195,7 @@ export default function BlogScreen({ navigation }: Props) {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={APP_CONFIG.colors.accent} />}
           >
             {/* Header */}
-            <BlurView intensity={20} tint="dark" style={styles.header}>
+            <GlassCard style={styles.header}>
               <View style={styles.headerTop}>
                 <TouchableOpacity onPress={() => navigation.navigate('Landing')} style={styles.backBtn}>
                   <ArrowRight size={24} color="#FFF" style={{ transform: [{ rotate: '180deg' }] }} />
@@ -236,7 +236,7 @@ export default function BlogScreen({ navigation }: Props) {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-            </BlurView>
+            </GlassCard>
 
             {filteredArticles.length > 0 ? (
               filteredArticles.map(renderArticle)

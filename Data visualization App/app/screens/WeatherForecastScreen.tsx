@@ -16,7 +16,7 @@ import {
     StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
+import GlassCard from '../components/GlassCard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     ChevronLeft,
@@ -182,7 +182,7 @@ const WeatherForecastScreen: React.FC = () => {
                         }
                     >
                         {/* ===== Header ===== */}
-                        <BlurView intensity={30} tint="dark" style={styles.header}>
+                        <GlassCard intensity={30} tint="dark" style={styles.header}>
                             <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
                                 <ChevronLeft size={22} color="#fff" />
                             </TouchableOpacity>
@@ -199,12 +199,12 @@ const WeatherForecastScreen: React.FC = () => {
                             <TouchableOpacity style={styles.headerBtn} onPress={onRefresh}>
                                 <RefreshCw size={17} color={APP_CONFIG.colors.accent} />
                             </TouchableOpacity>
-                        </BlurView>
+                        </GlassCard>
 
                         {/* City Picker Dropdown */}
                         {showCityPicker && (
                             <View style={styles.dropdown}>
-                                <BlurView intensity={40} tint="dark" style={styles.dropdownBlur}>
+                                <GlassCard intensity={40} tint="dark" style={styles.dropdownBlur}>
                                     {INDIAN_CITIES.map((city) => {
                                         const active = selectedCity.name === city.name;
                                         return (
@@ -223,7 +223,7 @@ const WeatherForecastScreen: React.FC = () => {
                                             </TouchableOpacity>
                                         );
                                     })}
-                                </BlurView>
+                                </GlassCard>
                             </View>
                         )}
                         {/* ===== Hero Weather ===== */}
@@ -252,7 +252,7 @@ const WeatherForecastScreen: React.FC = () => {
                                         { icon: Eye, label: 'Visibility', value: `${weather.visibility.toFixed(1)} km`, accent: APP_CONFIG.colors.info },
                                     ].map((s, i) => (
                                         <View key={i} style={styles.statCardWrap}>
-                                            <BlurView intensity={18} tint="dark" style={styles.statCard}>
+                                            <GlassCard intensity={18} tint="dark" style={styles.statCard}>
                                                 <LinearGradient
                                                     colors={[s.accent + '22', s.accent + '08'] as [string, string]}
                                                     style={styles.statIconWrap}
@@ -261,7 +261,7 @@ const WeatherForecastScreen: React.FC = () => {
                                                 </LinearGradient>
                                                 <Text style={styles.statValue}>{s.value}</Text>
                                                 <Text style={styles.statLabel}>{s.label}</Text>
-                                            </BlurView>
+                                            </GlassCard>
                                         </View>
                                     ))}
                                 </View>
@@ -271,7 +271,7 @@ const WeatherForecastScreen: React.FC = () => {
                         {/* ===== Sun Times ===== */}
                         {weather && (
                             <View style={styles.sunCardWrap}>
-                                <BlurView intensity={18} tint="dark" style={styles.sunCard}>
+                                <GlassCard intensity={18} tint="dark" style={styles.sunCard}>
                                     <View style={styles.sunItem}>
                                         <Sunrise size={26} color="#FCD34D" />
                                         <Text style={styles.sunTime}>{formatTime(weather.sunrise)}</Text>
@@ -283,7 +283,7 @@ const WeatherForecastScreen: React.FC = () => {
                                         <Text style={styles.sunTime}>{formatTime(weather.sunset)}</Text>
                                         <Text style={styles.sunLabel}>Sunset</Text>
                                     </View>
-                                </BlurView>
+                                </GlassCard>
                             </View>
                         )}
 
@@ -292,7 +292,7 @@ const WeatherForecastScreen: React.FC = () => {
                             <>
                                 <Text style={styles.sectionHeader}>AIR QUALITY</Text>
                                 <View style={styles.aqiCardWrap}>
-                                    <BlurView intensity={18} tint="dark" style={styles.aqiCard}>
+                                    <GlassCard intensity={18} tint="dark" style={styles.aqiCard}>
                                         <View style={styles.aqiHeader}>
                                             <Leaf size={18} color={getAQIColor(aqi.aqi)} />
                                             <Text style={styles.aqiHeaderTitle}>Air Quality Index</Text>
@@ -334,7 +334,7 @@ const WeatherForecastScreen: React.FC = () => {
                                                     ))}
                                             </View>
                                         </View>
-                                    </BlurView>
+                                    </GlassCard>
                                 </View>
                             </>
                         )}
@@ -344,7 +344,7 @@ const WeatherForecastScreen: React.FC = () => {
                             <>
                                 <Text style={styles.sectionHeader}>5-DAY FORECAST</Text>
                                 <View style={styles.forecastCardWrap}>
-                                    <BlurView intensity={18} tint="dark" style={styles.forecastCard}>
+                                    <GlassCard intensity={18} tint="dark" style={styles.forecastCard}>
                                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                                             <View style={styles.forecastScroll}>
                                                 {forecast.slice(0, 5).map((day: ForecastData, index: number) => {
@@ -370,7 +370,7 @@ const WeatherForecastScreen: React.FC = () => {
                                                 })}
                                             </View>
                                         </ScrollView>
-                                    </BlurView>
+                                    </GlassCard>
                                 </View>
                             </>
                         )}
@@ -393,7 +393,7 @@ const WeatherForecastScreen: React.FC = () => {
                                                 if (city) setSelectedCity(city);
                                             }}
                                         >
-                                            <BlurView intensity={15} tint="dark" style={styles.cityAqiBlur}>
+                                            <GlassCard intensity={15} tint="dark" style={styles.cityAqiBlur}>
                                                 <Text style={styles.cityAqiName} numberOfLines={1}>
                                                     {cityData.city.split(',')[0]}
                                                 </Text>
@@ -403,7 +403,7 @@ const WeatherForecastScreen: React.FC = () => {
                                                 <Text style={[styles.cityAqiLabel, { color: getAQIColor(cityData.aqi) }]}>
                                                     {getAQILabel(cityData.aqi)}
                                                 </Text>
-                                            </BlurView>
+                                            </GlassCard>
                                         </TouchableOpacity>
                                     ))}
                                 </View>
@@ -411,7 +411,7 @@ const WeatherForecastScreen: React.FC = () => {
                         )}
 
                         {/* ===== AQI Legend ===== */}
-                        <BlurView intensity={15} tint="dark" style={styles.legendCard}>
+                        <GlassCard intensity={15} tint="dark" style={styles.legendCard}>
                             <Text style={styles.legendTitle}>AQI Scale Reference</Text>
                             <View style={styles.legendBar}>
                                 <LinearGradient
@@ -426,7 +426,7 @@ const WeatherForecastScreen: React.FC = () => {
                                     <Text key={l} style={styles.legendLabel}>{l}</Text>
                                 ))}
                             </View>
-                        </BlurView>
+                        </GlassCard>
 
                         <View style={{ height: 30 }} />
                     </ScrollView>

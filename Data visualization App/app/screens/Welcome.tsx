@@ -23,7 +23,7 @@ import ParticleBackground from '../components/ParticleBackground';
 import { useSafeAuth as useAuth, useSafeOAuth as useOAuth, useSafeUser as useUser } from '../utils/useClerkSafe';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
+import GlassCard from '../components/GlassCard';
 
 // Warm up browser for OAuth
 WebBrowser.maybeCompleteAuthSession();
@@ -181,7 +181,7 @@ const Welcome = () => {
               transform: [{ translateY: contentTranslateY }]
             }
           ]}>
-            <BlurView intensity={30} tint="dark" style={styles.glassCard}>
+            <GlassCard style={styles.glassCard}>
 
               {isSignedIn && user ? (
                 <View style={styles.userSection}>
@@ -238,7 +238,7 @@ const Welcome = () => {
                   )}
                 </View>
               )}
-            </BlurView>
+            </GlassCard>
           </Animated.View>
 
           <Text style={styles.version}>{`v${APP_CONFIG.version} • ISRO Hackathon Edition`}</Text>

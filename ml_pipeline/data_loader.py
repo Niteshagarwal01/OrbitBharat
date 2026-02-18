@@ -174,7 +174,7 @@ class DSCOVRDataLoader:
         df = df[[c for c in final_cols if c in df.columns]]
         
         # Forward fill missing values (max 5 minutes)
-        df = df.fillna(method='ffill', limit=5)
+        df = df.ffill(limit=5)
         
         # Cache
         if self.cache_enabled:
@@ -213,7 +213,7 @@ class DSCOVRDataLoader:
         features = ['speed', 'density', 'temperature', 'bz', 'bt', 'beta']
         
         # Fill any remaining NaN
-        df_window = df_window[features].fillna(method='ffill').fillna(method='bfill')
+        df_window = df_window[features].ffill().bfill()
         
         # Normalization parameters (from typical solar wind conditions)
         norm_params = {

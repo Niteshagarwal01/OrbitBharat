@@ -47,6 +47,7 @@ function AppNavigator() {
     >
       <StatusBar style="light" />
       <Stack.Navigator
+        id="RootStack"
         initialRouteName="Welcome"
         screenOptions={{
           headerShown: false,

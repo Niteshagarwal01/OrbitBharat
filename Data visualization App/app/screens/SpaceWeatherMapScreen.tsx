@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import { BlurView } from 'expo-blur';
+import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ChevronLeft,
@@ -309,7 +309,7 @@ const SpaceWeatherMapScreen: React.FC = () => {
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
         {/* Header */}
-        <BlurView intensity={20} tint="dark" style={styles.header}>
+        <GlassCard intensity={20} tint="dark" style={styles.header}>
           <View style={styles.headerRow}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn as any}>
               <ChevronLeft size={22} color="#fff" />
@@ -322,7 +322,7 @@ const SpaceWeatherMapScreen: React.FC = () => {
               <RefreshCw size={18} color={refreshing ? APP_CONFIG.colors.accent : '#fff'} />
             </TouchableOpacity>
           </View>
-        </BlurView>
+        </GlassCard>
 
         <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Map */}
@@ -348,7 +348,7 @@ const SpaceWeatherMapScreen: React.FC = () => {
           </View>
 
           {/* Kp Gauge Card */}
-          <BlurView intensity={25} tint="dark" style={styles.kpCard}>
+          <GlassCard intensity={25} tint="dark" style={styles.kpCard}>
             <View style={styles.kpRow}>
               <View style={styles.kpGauge}>
                 <View style={[styles.kpCircle, { borderColor: kpColor }]}>
@@ -372,41 +372,41 @@ const SpaceWeatherMapScreen: React.FC = () => {
                 />
               </View>
             </View>
-          </BlurView>
+          </GlassCard>
 
           {/* Live Metrics Grid */}
           <View style={styles.metricsGrid}>
-            <BlurView intensity={20} tint="dark" style={styles.metricCard}>
+            <GlassCard intensity={20} tint="dark" style={styles.metricCard}>
               <Wind size={18} color="#38BDF8" />
               <Text style={styles.metricValue}>{data.windSpeed}</Text>
               <Text style={styles.metricUnit}>km/s</Text>
               <Text style={styles.metricLabel}>Solar Wind</Text>
-            </BlurView>
+            </GlassCard>
 
-            <BlurView intensity={20} tint="dark" style={styles.metricCard}>
+            <GlassCard intensity={20} tint="dark" style={styles.metricCard}>
               <Activity size={18} color="#22C55E" />
               <Text style={styles.metricValue}>{data.windDensity}</Text>
               <Text style={styles.metricUnit}>p/cm³</Text>
               <Text style={styles.metricLabel}>Proton Density</Text>
-            </BlurView>
+            </GlassCard>
 
-            <BlurView intensity={20} tint="dark" style={styles.metricCard}>
+            <GlassCard intensity={20} tint="dark" style={styles.metricCard}>
               <Zap size={18} color={data.bzComponent < -5 ? '#EF4444' : '#A78BFA'} />
               <Text style={styles.metricValue}>{data.bzComponent}</Text>
               <Text style={styles.metricUnit}>nT</Text>
               <Text style={styles.metricLabel}>IMF Bz</Text>
-            </BlurView>
+            </GlassCard>
 
-            <BlurView intensity={20} tint="dark" style={styles.metricCard}>
+            <GlassCard intensity={20} tint="dark" style={styles.metricCard}>
               <Shield size={18} color={data.stormPotential === 'Low' ? '#22C55E' : '#F97316'} />
               <Text style={[styles.metricValue, { fontSize: 16 }]}>{data.stormPotential}</Text>
               <Text style={styles.metricUnit}> </Text>
               <Text style={styles.metricLabel}>Storm Risk</Text>
-            </BlurView>
+            </GlassCard>
           </View>
 
           {/* Aurora Visibility Card */}
-          <BlurView intensity={20} tint="dark" style={styles.auroraCard}>
+          <GlassCard intensity={20} tint="dark" style={styles.auroraCard}>
             <View style={styles.auroraRow}>
               <Compass size={20} color="#A78BFA" />
               <Text style={styles.auroraTitle}>Aurora Visibility</Text>
@@ -430,10 +430,10 @@ const SpaceWeatherMapScreen: React.FC = () => {
                 </Text>
               </View>
             )}
-          </BlurView>
+          </GlassCard>
 
           {/* Interpretation Card */}
-          <BlurView intensity={15} tint="dark" style={styles.interpretCard}>
+          <GlassCard intensity={15} tint="dark" style={styles.interpretCard}>
             <Text style={styles.interpretTitle}>What This Means</Text>
             <Text style={styles.interpretText}>
               {data.kpIndex >= 7
@@ -445,7 +445,7 @@ const SpaceWeatherMapScreen: React.FC = () => {
                     : 'Quiet geomagnetic conditions. Normal operations for satellites, navigation, and communications. Aurora confined to polar regions.'
               }
             </Text>
-          </BlurView>
+          </GlassCard>
 
           <View style={{ height: 40 }} />
         </ScrollView>

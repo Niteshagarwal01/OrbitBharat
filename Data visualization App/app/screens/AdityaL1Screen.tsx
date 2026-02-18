@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
+import GlassCard from '../components/GlassCard';
 import {
   Sun,
   Wind,
@@ -343,7 +343,7 @@ const AdityaL1Screen: React.FC = () => {
           { label: 'TEMPERATURE', value: fmt(data.swis.protonTemperature / 1000, 0) + 'K', unit: '×1000', badge: '', icon: Thermometer },
         ].map((item, i) => (
           <View key={i} style={s.paramCardWrap}>
-            <BlurView intensity={10} tint="light" style={s.paramCard}>
+            <GlassCard style={s.paramCard}>
               <item.icon size={20} color={APP_CONFIG.colors.accent} style={{ marginBottom: 8 }} />
               <Text style={s.paramValue}>{item.value}</Text>
               <Text style={s.paramUnit}>{item.unit}</Text>
@@ -353,7 +353,7 @@ const AdityaL1Screen: React.FC = () => {
                 </View>
               )}
               <Text style={s.paramLabel}>{item.label}</Text>
-            </BlurView>
+            </GlassCard>
           </View>
         ))}
       </View>
@@ -371,13 +371,13 @@ const AdityaL1Screen: React.FC = () => {
           { name: 'MAG', desc: 'Magnetometer' },
         ].map((p, i) => (
           <View key={i} style={s.payloadChipWrap}>
-            <BlurView intensity={10} tint="light" style={s.payloadChip}>
+            <GlassCard style={s.payloadChip}>
               <View style={s.payloadDot} />
               <View>
                 <Text style={s.payloadName}>{p.name}</Text>
                 <Text style={s.payloadDesc}>{p.desc}</Text>
               </View>
-            </BlurView>
+            </GlassCard>
           </View>
         ))}
       </ScrollView>
@@ -652,7 +652,7 @@ const AdityaL1Screen: React.FC = () => {
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
         {/* Header */}
-        <BlurView intensity={20} tint="dark" style={s.header}>
+        <GlassCard style={s.header}>
           <View style={s.headerRow}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
               <ChevronLeft size={22} color="#FFF" />
@@ -667,7 +667,7 @@ const AdityaL1Screen: React.FC = () => {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </BlurView>
+        </GlassCard>
 
         {/* Tabs */}
         {renderTabs()}

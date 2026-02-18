@@ -3,7 +3,7 @@ import { View, TouchableOpacity, StyleSheet, Dimensions, Animated } from 'react-
 import { Ionicons } from '@expo/vector-icons';
 import { APP_CONFIG } from '../utils/constants';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
+import GlassCard from './GlassCard';
 
 const { width } = Dimensions.get('window');
 
@@ -99,7 +99,7 @@ export default function FloatingNavbar({ activeTab, onTabPress }: FloatingNavbar
         ]}
         style={styles.gradientContainer}
       >
-        <BlurView intensity={30} tint="dark" style={styles.blurContainer}>
+        <GlassCard intensity={30} tint="dark" style={styles.blurContainer}>
           {tabs.map((tab, index) => {
             const isActive = activeTab === tab.id;
             const scale = animatedValues[index].interpolate({
@@ -157,7 +157,7 @@ export default function FloatingNavbar({ activeTab, onTabPress }: FloatingNavbar
               </Animated.View>
             );
           })}
-        </BlurView>
+        </GlassCard>
       </LinearGradient>
     </Animated.View>
   );

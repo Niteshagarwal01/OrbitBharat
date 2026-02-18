@@ -44,7 +44,7 @@ import {
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
-import { BlurView } from 'expo-blur';
+import GlassCard from '../components/GlassCard';
 import { APP_CONFIG } from '../utils/constants';
 import { logger } from '../utils/logger';
 import { getTrendColor } from '../utils/helpers';
@@ -249,7 +249,7 @@ export default function Landing({ navigation }: Props) {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={APP_CONFIG.colors.accent} />}
         >
           {/* Top Navbar */}
-          <BlurView intensity={20} tint="dark" style={styles.topNav}>
+          <GlassCard intensity={20} tint="dark" style={styles.topNav}>
             <View style={styles.headerRow}>
               <View style={styles.brandContainer}>
                 <Sun size={24} color={APP_CONFIG.colors.accent} style={styles.logoIcon} />
@@ -265,7 +265,7 @@ export default function Landing({ navigation }: Props) {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-          </BlurView>
+          </GlassCard>
 
 
           {/* Main Hero - System Status */}
@@ -343,7 +343,7 @@ export default function Landing({ navigation }: Props) {
           <View style={styles.gridContainer}>
             {/* Simulation Card */}
             <TouchableOpacity onPress={() => handleNavigation('GraphSimulation')} style={[styles.gridCard, { width: cardWidth }]}>
-              <BlurView intensity={20} tint="light" style={styles.glassInner}>
+              <GlassCard intensity={20} tint="light" style={styles.glassInner}>
                 <View style={styles.cardIconConfig}>
                   <LinearGradient colors={['#0066FF', '#00A3FF']} style={styles.iconGradient}>
                     <LayoutDashboard size={24} color="#FFF" />
@@ -354,12 +354,12 @@ export default function Landing({ navigation }: Props) {
                 <View style={styles.cardArrow}>
                   <ArrowRight size={16} color="#FFF" />
                 </View>
-              </BlurView>
+              </GlassCard>
             </TouchableOpacity>
 
             {/* Prediction Card */}
             <TouchableOpacity onPress={() => handleNavigation('Prediction')} style={[styles.gridCard, { width: cardWidth }]}>
-              <BlurView intensity={20} tint="light" style={styles.glassInner}>
+              <GlassCard intensity={20} tint="light" style={styles.glassInner}>
                 <View style={styles.cardIconConfig}>
                   <LinearGradient colors={['#0044CC', '#0066FF']} style={styles.iconGradient}>
                     <Cpu size={24} color="#FFF" />
@@ -370,12 +370,12 @@ export default function Landing({ navigation }: Props) {
                 <View style={styles.cardArrow}>
                   <ArrowRight size={16} color="#FFF" />
                 </View>
-              </BlurView>
+              </GlassCard>
             </TouchableOpacity>
 
             {/* Aditya L1 Data Card */}
             <TouchableOpacity onPress={() => handleNavigation('AdityaL1')} style={[styles.gridCard, { width: cardWidth }]}>
-              <BlurView intensity={20} tint="light" style={styles.glassInner}>
+              <GlassCard intensity={20} tint="light" style={styles.glassInner}>
                 <View style={styles.cardIconConfig}>
                   <LinearGradient colors={['#FF6B00', '#FF9500']} style={styles.iconGradient}>
                     <Sun size={24} color="#FFF" />
@@ -386,12 +386,12 @@ export default function Landing({ navigation }: Props) {
                 <View style={styles.cardArrow}>
                   <ArrowRight size={16} color="#FFF" />
                 </View>
-              </BlurView>
+              </GlassCard>
             </TouchableOpacity>
 
             {/* Satellite Tracker Card */}
             <TouchableOpacity onPress={() => handleNavigation('SatelliteTracker')} style={[styles.gridCard, { width: cardWidth }]}>
-              <BlurView intensity={20} tint="light" style={styles.glassInner}>
+              <GlassCard intensity={20} tint="light" style={styles.glassInner}>
                 <View style={styles.cardIconConfig}>
                   <LinearGradient colors={['#3399FF', '#00A3FF']} style={styles.iconGradient}>
                     <Satellite size={24} color="#FFF" />
@@ -402,12 +402,12 @@ export default function Landing({ navigation }: Props) {
                 <View style={styles.cardArrow}>
                   <ArrowRight size={16} color="#FFF" />
                 </View>
-              </BlurView>
+              </GlassCard>
             </TouchableOpacity>
 
             {/* Weather Forecast Card */}
             <TouchableOpacity onPress={() => handleNavigation('WeatherForecast')} style={[styles.gridCard, { width: cardWidth }]}>
-              <BlurView intensity={20} tint="light" style={styles.glassInner}>
+              <GlassCard intensity={20} tint="light" style={styles.glassInner}>
                 <View style={styles.cardIconConfig}>
                   <LinearGradient colors={['#9333EA', '#A855F7']} style={styles.iconGradient}>
                     <CloudSun size={24} color="#FFF" />
@@ -418,12 +418,12 @@ export default function Landing({ navigation }: Props) {
                 <View style={styles.cardArrow}>
                   <ArrowRight size={16} color="#FFF" />
                 </View>
-              </BlurView>
+              </GlassCard>
             </TouchableOpacity>
 
             {/* Global Space Weather Map */}
             <TouchableOpacity onPress={() => handleNavigation('SpaceWeatherMap')} style={[styles.gridCard, { width: cardWidth }]}>
-              <BlurView intensity={20} tint="light" style={styles.glassInner}>
+              <GlassCard intensity={20} tint="light" style={styles.glassInner}>
                 <View style={styles.cardIconConfig}>
                   <LinearGradient colors={['#0ea5e9', '#22c55e']} style={styles.iconGradient}>
                     <Globe size={24} color="#FFF" />
@@ -434,12 +434,12 @@ export default function Landing({ navigation }: Props) {
                 <View style={styles.cardArrow}>
                   <ArrowRight size={16} color="#FFF" />
                 </View>
-              </BlurView>
+              </GlassCard>
             </TouchableOpacity>
 
             {/* Community Blog Card */}
             <TouchableOpacity onPress={() => handleNavigation('Blog')} style={[styles.gridCard, { width: cardWidth }]}>
-              <BlurView intensity={20} tint="light" style={styles.glassInner}>
+              <GlassCard intensity={20} tint="light" style={styles.glassInner}>
                 <View style={styles.cardIconConfig}>
                   <LinearGradient colors={['#0066FF', '#3399FF']} style={styles.iconGradient}>
                     <Globe size={24} color="#FFF" />
@@ -450,7 +450,7 @@ export default function Landing({ navigation }: Props) {
                 <View style={styles.cardArrow}>
                   <ArrowRight size={16} color="#FFF" />
                 </View>
-              </BlurView>
+              </GlassCard>
             </TouchableOpacity>
           </View>
 
@@ -474,11 +474,11 @@ export default function Landing({ navigation }: Props) {
               { label: 'MAG FIELD', value: '6.2', unit: 'nT', icon: Zap, color: APP_CONFIG.colors.accent }
             ].map((item, index) => (
               <View key={index} style={styles.telemetryCardWrap}>
-                <BlurView intensity={10} tint="light" style={styles.telemetryCard}>
+                <GlassCard intensity={10} tint="light" style={styles.telemetryCard}>
                   <item.icon size={18} color={item.color} style={{ marginBottom: 8 }} />
                   <Text style={styles.telemetryValue}>{item.value}<Text style={styles.telemetryUnit}>{item.unit}</Text></Text>
                   <Text style={styles.telemetryLabel}>{item.label}</Text>
-                </BlurView>
+                </GlassCard>
               </View>
             ))}
           </ScrollView>

@@ -21,7 +21,7 @@ import {
     Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
+import GlassCard from '../components/GlassCard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     Satellite,
@@ -236,6 +236,26 @@ const SatelliteTrackerScreen: React.FC = () => {
 
     const fetchSatellitePositions = useCallback(async () => {
         try {
+            // ── Quick network-reachability check (doesn't depend on N2YO) ──
+            // Try Android's own captive-portal URL first, then Google fallback.
+            const checkUrls = [
+                'https://connectivitycheck.gstatic.com/generate_204',
+                'https://www.google.com/generate_204',
+                'https://clients3.google.com/generate_204',
+            ];
+            let reachable = false;
+            for (const url of checkUrls) {
+                try {
+                    const ctrl = new AbortController();
+                    const t = setTimeout(() => ctrl.abort(), 6000);
+                    await fetch(url, { method: 'HEAD', signal: ctrl.signal });
+                    clearTimeout(t);
+                    reachable = true;
+                    break; // one success is enough
+                } catch { /* try next */ }
+            }
+            setIsOnline(reachable);
+
             const newPositions = new Map<string, SatellitePosition>();
             let successCount = 0;
 
@@ -260,15 +280,12 @@ const SatelliteTrackerScreen: React.FC = () => {
 
             if (newPositions.size > 0) {
                 setPositions(newPositions);
-                setIsOnline(true);
-            } else {
-                setIsOnline(false);
             }
 
             setActiveCount(successCount);
             setLastUpdate(new Date());
         } catch {
-            setIsOnline(false);
+            // keep previous isOnline value; only the reachability check above toggles it
         } finally {
             setLoading(false);
         }
@@ -323,7 +340,7 @@ const SatelliteTrackerScreen: React.FC = () => {
                     if (isSpecial) (navigation as any).navigate('AdityaL1');
                 }}
             >
-                <BlurView intensity={20} tint="dark" style={styles.cardBlur}>
+                <GlassCard style={styles.cardBlur}>
                     {/* header row */}
                     <View style={styles.cardHeader}>
                         <LinearGradient colors={config.gradient} style={styles.iconCircle}>
@@ -438,7 +455,7 @@ const SatelliteTrackerScreen: React.FC = () => {
                             <ChevronRight size={14} color="#fff" />
                         </LinearGradient>
                     )}
-                </BlurView>
+                </GlassCard>
             </TouchableOpacity>
         );
     };
@@ -489,7 +506,7 @@ const SatelliteTrackerScreen: React.FC = () => {
                     ListHeaderComponent={
                         <>
                             {/* Header */}
-                            <BlurView intensity={30} tint="dark" style={styles.header}>
+                            <GlassCard style={styles.header}>
                                 <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
                                     <ChevronLeft size={22} color="#fff" />
                                 </TouchableOpacity>
@@ -504,7 +521,7 @@ const SatelliteTrackerScreen: React.FC = () => {
                                         <RefreshCw size={17} color={APP_CONFIG.colors.accent} />
                                     </TouchableOpacity>
                                 </View>
-                            </BlurView>
+                            </GlassCard>
 
                             {/* Stats Hero / Map Switcher */}
                             <View style={styles.viewToggle}>
@@ -542,7 +559,7 @@ const SatelliteTrackerScreen: React.FC = () => {
                                 </View>
                             ) : (
                                 <View style={styles.heroWrap}>
-                                    <BlurView intensity={20} tint="dark" style={styles.heroBlur}>
+                                    <GlassCard style={styles.heroBlur}>
                                         <View style={styles.heroContent}>
                                             <View style={styles.heroItem}>
                                                 <LinearGradient
@@ -597,7 +614,7 @@ const SatelliteTrackerScreen: React.FC = () => {
                                                 <Text style={styles.heroLabel}>STATUS</Text>
                                             </View>
                                         </View>
-                                    </BlurView>
+                                    </GlassCard>
                                 </View>
                             )}
 
@@ -641,11 +658,11 @@ const SatelliteTrackerScreen: React.FC = () => {
                             style={styles.externalLink}
                             onPress={() => Linking.openURL('https://www.n2yo.com/?s=ISRO')}
                         >
-                            <BlurView intensity={15} tint="dark" style={styles.externalBlur}>
+                            <GlassCard style={styles.externalBlur}>
                                 <Globe size={16} color={APP_CONFIG.colors.accent} />
                                 <Text style={styles.externalText}>View Full Tracker on N2YO</Text>
                                 <ExternalLink size={13} color={APP_CONFIG.colors.accent} />
-                            </BlurView>
+                            </GlassCard>
                         </TouchableOpacity>
                     }
                 />

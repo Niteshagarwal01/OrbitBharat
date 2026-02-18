@@ -2,8 +2,8 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
 
-interface ParticleBackgroundProps {
-  children: React.ReactNode;
+export interface ParticleBackgroundProps {
+  children?: React.ReactNode;
 }
 
 export default function ParticleBackground({ children }: ParticleBackgroundProps) {

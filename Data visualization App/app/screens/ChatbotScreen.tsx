@@ -33,7 +33,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
+import GlassCard from '../components/GlassCard';
 import LottieView from 'lottie-react-native';
 import { APP_CONFIG } from '../utils/constants';
 import { API_CONFIG, isApiConfigured, buildSearchUrl } from '../utils/apiConfig';
@@ -287,7 +287,7 @@ export default function ChatbotScreen({ navigation }: Props) {
 
         {/* Glass Header */}
         <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
-          <BlurView intensity={30} tint="dark" style={styles.headerBlur}>
+          <GlassCard style={styles.headerBlur}>
             <View style={styles.headerContent}>
               <TouchableOpacity onPress={() => navigation.navigate('Landing')} style={styles.backButton}>
                 <ChevronLeft size={24} color="#FFF" />
@@ -303,12 +303,12 @@ export default function ChatbotScreen({ navigation }: Props) {
                 <MoreVertical size={24} color="#FFF" />
               </TouchableOpacity>
             </View>
-          </BlurView>
+          </GlassCard>
         </Animated.View>
 
         {/* Mode Toggle */}
         <View style={styles.modeToggleContainer}>
-          <BlurView intensity={20} tint="light" style={styles.toggleBlur}>
+          <GlassCard style={styles.toggleBlur}>
             <TouchableOpacity
               style={[styles.toggleBtn, responseMode === 'model' && styles.activeToggle]}
               onPress={() => setResponseMode('model')}
@@ -323,7 +323,7 @@ export default function ChatbotScreen({ navigation }: Props) {
               <Globe size={14} color={responseMode === 'web' ? '#FFF' : '#AAA'} />
               <Text style={[styles.toggleText, responseMode === 'web' && styles.activeToggleText]}>Web Search</Text>
             </TouchableOpacity>
-          </BlurView>
+          </GlassCard>
         </View>
 
         <KeyboardAvoidingView
@@ -342,10 +342,10 @@ export default function ChatbotScreen({ navigation }: Props) {
               <View style={styles.quickGrid}>
                 {quickQuestions.map((q, i) => (
                   <TouchableOpacity key={i} onPress={() => handleQuickQuestion(q.text)} style={styles.quickCard}>
-                    <BlurView intensity={10} tint="light" style={styles.quickCardInner}>
+                    <GlassCard style={styles.quickCardInner}>
                       <q.icon size={20} color={APP_CONFIG.colors.accent} style={{ marginBottom: 8 }} />
                       <Text style={styles.quickCardText}>{q.text}</Text>
-                    </BlurView>
+                    </GlassCard>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -370,7 +370,7 @@ export default function ChatbotScreen({ navigation }: Props) {
                       <Text style={styles.userText}>{message.text}</Text>
                     </LinearGradient>
                   ) : (
-                    <BlurView intensity={20} tint="dark" style={styles.aiBubbleBlur}>
+                    <GlassCard style={styles.aiBubbleBlur}>
                       <View style={styles.aiBubbleContent}>
                         <Text style={styles.aiName}>{message.source === 'web' ? 'System • Web Search' : 'System • AI Model'}</Text>
                         {renderFormattedText(message.text)}
@@ -381,7 +381,7 @@ export default function ChatbotScreen({ navigation }: Props) {
                           </View>
                         ))}
                       </View>
-                    </BlurView>
+                    </GlassCard>
                   )}
                 </View>
               </View>
@@ -394,20 +394,20 @@ export default function ChatbotScreen({ navigation }: Props) {
                     <Brain size={16} color="#FFF" />
                   </LinearGradient>
                 </View>
-                <BlurView intensity={20} tint="dark" style={styles.typingBubble}>
+                <GlassCard style={styles.typingBubble}>
                   <LottieView
                     source={require('../../assets/loading.json')} // Assuming you have a loading lottie, else simple dots
                     autoPlay loop
                     style={{ width: 40, height: 20 }}
                   />
-                </BlurView>
+                </GlassCard>
               </View>
             )}
 
           </ScrollView>
 
           {/* Input Area */}
-          <BlurView intensity={40} tint="dark" style={styles.inputArea}>
+          <GlassCard style={styles.inputArea}>
             <TextInput
               style={styles.input}
               value={inputText}
@@ -424,7 +424,7 @@ export default function ChatbotScreen({ navigation }: Props) {
                 <Send size={20} color={inputText.trim() ? '#FFF' : '#888'} />
               </LinearGradient>
             </TouchableOpacity>
-          </BlurView>
+          </GlassCard>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </ParticleBackground>
