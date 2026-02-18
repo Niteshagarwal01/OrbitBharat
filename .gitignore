@@ -1,0 +1,48 @@
+# ─── Node / Expo ───────────────────────────────────
+node_modules/
+.expo/
+dist/
+*.tsbuildinfo
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Python ────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+*.whl
+
+# ─── Environment / Secrets ─────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ─── OS files ──────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# ─── IDE ───────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+
+# ─── Build outputs ─────────────────────────────────
+build/
+*.apk
+*.aab
+*.ipa
+
+# ─── ngrok ─────────────────────────────────────────
+ngrok.yml
