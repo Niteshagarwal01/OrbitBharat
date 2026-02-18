@@ -150,6 +150,14 @@ class CMEPredictionAPI {
     }
 
     /**
+     * Force-refresh accuracy metrics (clears server-side cache).
+     * Use this on app startup to avoid stale validation data.
+     */
+    async refreshAccuracy(): Promise<AccuracyMetrics> {
+        return this.fetch('/api/accuracy/refresh');
+    }
+
+    /**
      * Get feature importance for explainability
      */
     async getFeatureImportance(): Promise<FeatureImportance> {
