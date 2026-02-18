@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Component, ErrorInfo, ReactNode } from 'react';
 import {
     View,
     Text,
@@ -10,6 +10,7 @@ import {
     RefreshControl,
     Animated,
     Dimensions,
+    Platform,
 } from 'react-native';
 import {
     Clock,
@@ -32,9 +33,34 @@ import {
     LineChart,
     BarChart,
 } from "react-native-chart-kit";
+
+/** Lightweight error boundary that swallows chart‑rendering crashes */
+class ChartSafe extends Component<{ children: ReactNode; fallbackText?: string }, { crashed: boolean }> {
+    state = { crashed: false };
+    static getDerivedStateFromError() { return { crashed: true }; }
+    componentDidCatch(e: Error, info: ErrorInfo) { console.warn('ChartSafe caught', e.message); }
+    render() {
+        if (this.state.crashed) {
+            return (
+                <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center', minHeight: 120 }}>
+                    <AlertTriangle size={28} color="#FF9500" />
+                    <Text style={{ color: '#94A3B8', marginTop: 8, fontSize: 12 }}>
+                        {this.props.fallbackText || 'Chart unavailable on this device'}
+                    </Text>
+                </View>
+            );
+        }
+        return this.props.children;
+    }
+}
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
+// BlurView crashes on many Android devices — use a plain semi-transparent View
+const GlassCard = ({ children, style, ...rest }: any) => (
+    <View style={[{ backgroundColor: 'rgba(13,17,23,0.85)', borderRadius: 18, overflow: 'hidden' }, style]} {...rest}>
+        {children}
+    </View>
+);
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
 import ParticleBackground from '../components/ParticleBackground';
@@ -75,13 +101,13 @@ const getAlertColor = (level: string): [string, string] => {
 };
 
 const MetricCard = ({ icon: Icon, label, value, unit, color }: any) => (
-    <BlurView intensity={20} tint="dark" style={styles.metricCard}>
+    <GlassCard style={styles.metricCard}>
         <View style={[styles.iconContainer, { backgroundColor: `${color}20` }]}>
             <Icon size={20} color={color} />
         </View>
-        <Text style={styles.metricValue}>{value}<Text style={styles.metricUnit}>{unit}</Text></Text>
+        <Text style={styles.metricValue}>{value ?? '--'}<Text style={styles.metricUnit}>{unit}</Text></Text>
         <Text style={styles.metricLabel}>{label}</Text>
-    </BlurView>
+    </GlassCard>
 );
 
 const buildNarrativeSummary = (
@@ -262,7 +288,7 @@ export default function PredictionDashboard({ navigation }: Props) {
                     />
 
                     {/* Narrative Summary */}
-                    <BlurView intensity={25} tint="dark" style={styles.summaryCard}>
+                    <GlassCard style={styles.summaryCard}>
                         <View style={styles.summaryHeader}>
                             <View style={[styles.summaryDot, { backgroundColor: alertColors[0] }]} />
                             <Text style={styles.summaryTitle}>Mission Status</Text>
@@ -275,17 +301,17 @@ export default function PredictionDashboard({ navigation }: Props) {
                             legendLabels={['Low', 'Moderate', 'High']}
                             barHeight={6}
                         />
-                    </BlurView>
+                    </GlassCard>
 
                     {/* Status Bar */}
                     <Animated.View style={[styles.statusBar, { opacity: fadeAnim }]}>
-                        <BlurView intensity={20} tint="light" style={styles.statusBlur}>
+                        <GlassCard style={styles.statusBlur}>
                             <View style={styles.statusRow}>
                                 <View style={[styles.statusDot, { backgroundColor: apiConnected ? APP_CONFIG.colors.success : APP_CONFIG.colors.warning }]} />
                                 <Text style={styles.statusText}>{apiConnected ? 'ML MODEL CONNECTED' : 'DEMO MODE - DISCONNECTED'}</Text>
                             </View>
                             <Text style={styles.updateText}>{lastUpdate}</Text>
-                        </BlurView>
+                        </GlassCard>
                     </Animated.View>
 
                     {/* Main Gauge Section */}
@@ -307,20 +333,20 @@ export default function PredictionDashboard({ navigation }: Props) {
 
                         {/* Arrival & Confidence */}
                         <View style={styles.predictionMeta}>
-                            <BlurView intensity={20} tint="dark" style={styles.metaCard}>
+                            <GlassCard style={styles.metaCard}>
                                 <Clock size={20} color="#FFF" />
                                 <View>
                                     <Text style={styles.metaLabel}>ETA Arrival</Text>
                                     <Text style={styles.metaValue}>{prediction?.arrival_time_eta || '--'}</Text>
                                 </View>
-                            </BlurView>
-                            <BlurView intensity={20} tint="dark" style={styles.metaCard}>
+                            </GlassCard>
+                            <GlassCard style={styles.metaCard}>
                                 <Shield size={20} color="#FFF" />
                                 <View>
                                     <Text style={styles.metaLabel}>Confidence</Text>
                                     <Text style={styles.metaValue}>{prediction?.confidence}%</Text>
                                 </View>
-                            </BlurView>
+                            </GlassCard>
                         </View>
                     </Animated.View>
 
@@ -360,7 +386,8 @@ export default function PredictionDashboard({ navigation }: Props) {
                     {/* Historical Trend Chart */}
                     <Text style={styles.sectionHeader}>Probability Trend (Last 24h)</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chartScroll}>
-                        <BlurView intensity={20} tint="dark" style={styles.chartCard}>
+                        <GlassCard style={styles.chartCard}>
+                          <ChartSafe fallbackText="Trend chart unavailable">
                             <LineChart
                                 data={{
                                     labels: ["-24h", "-20h", "-16h", "-12h", "-8h", "-4h", "Now"],
@@ -393,12 +420,14 @@ export default function PredictionDashboard({ navigation }: Props) {
                                 bezier
                                 style={{ marginVertical: 8, borderRadius: 16 }}
                             />
-                        </BlurView>
+                          </ChartSafe>
+                        </GlassCard>
                     </ScrollView>
 
                     {/* Solar Wind Histogram */}
                     <Text style={styles.sectionHeader}>Solar Wind Speed (Last 6h)</Text>
-                    <BlurView intensity={20} tint="dark" style={styles.chartCard}>
+                    <GlassCard style={styles.chartCard}>
+                      <ChartSafe fallbackText="Wind speed chart unavailable">
                         <BarChart
                             data={{
                                 labels: ["-5h", "-4h", "-3h", "-2h", "-1h", "Now"],
@@ -427,11 +456,12 @@ export default function PredictionDashboard({ navigation }: Props) {
                             }}
                             style={{ marginVertical: 8, borderRadius: 16 }}
                         />
-                    </BlurView>
+                      </ChartSafe>
+                    </GlassCard>
 
                     {/* Model Performance */}
                     <Text style={styles.sectionHeader}>Model Metrics (Bi-LSTM)</Text>
-                    <BlurView intensity={20} tint="dark" style={styles.modelCard}>
+                    <GlassCard style={styles.modelCard}>
                         <View style={styles.modelGrid}>
                             <View style={styles.modelItem}>
                                 <Text style={styles.modelValue}>{accuracy?.accuracy}%</Text>
@@ -457,17 +487,18 @@ export default function PredictionDashboard({ navigation }: Props) {
                             <Info size={14} color="rgba(255,255,255,0.5)" />
                             <Text style={styles.modelFooterText}>Validated on {accuracy?.total_events_tested} historical events • {accuracy?.validation_period}</Text>
                         </View>
-                    </BlurView>
+                    </GlassCard>
 
                     {/* Model Explainability */}
                     {topFi.length > 0 && (
                         <>
                             <Text style={styles.sectionHeader}>Top Input Drivers</Text>
-                            <BlurView intensity={20} tint="dark" style={styles.explainCard}>
+                            <GlassCard style={styles.explainCard}>
                                 <View style={styles.explainHeader}>
                                     <BarChart2 size={18} color={APP_CONFIG.colors.accent} />
                                     <Text style={styles.explainTitle}>Feature Importance</Text>
                                 </View>
+                                <ChartSafe fallbackText="Feature importance chart unavailable">
                                 <BarChart
                                     data={{
                                         labels: topFi.map(f => f.name.split(' ').slice(0, 2).join(' ')),
@@ -493,20 +524,21 @@ export default function PredictionDashboard({ navigation }: Props) {
                                     style={styles.explainChart}
                                     fromZero
                                 />
+                                </ChartSafe>
                                 <Text style={styles.explainCaption}>
                                     Higher bars mean the feature contributes more to today&apos;s CME risk estimate.
                                 </Text>
-                            </BlurView>
+                            </GlassCard>
                         </>
                     )}
 
                     {/* Architecture Details */}
                     <TouchableOpacity style={styles.archButton}>
-                        <BlurView intensity={20} tint="light" style={styles.archBlur}>
+                        <GlassCard style={styles.archBlur}>
                             <Cpu size={20} color="#FFF" />
                             <Text style={styles.archText}>View Neural Network Architecture</Text>
                             <Share2 size={16} color="rgba(255,255,255,0.5)" />
-                        </BlurView>
+                        </GlassCard>
                     </TouchableOpacity>
 
                     <View style={{ height: 40 }} />
