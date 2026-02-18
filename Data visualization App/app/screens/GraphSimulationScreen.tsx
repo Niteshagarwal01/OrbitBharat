@@ -41,26 +41,76 @@ import {
   RotateCcw
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import Header from '../components/Header';
-import { APP_CONFIG, TIME_FILTERS } from '../utils/constants';
+import GlassCard from '../components/GlassCard';
+import { APP_CONFIG } from '../utils/constants';
 import { logger } from '../utils/logger';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
 import ParticleBackground from '../components/ParticleBackground';
 import { getSpaceWeatherSummary } from '../utils/nasaApi';
-import { getRealTimeSolarWindSummary, getAuroraForecast } from '../utils/noaaApi';
+import {
+  getRealTimeSolarWindSummary,
+  getAuroraForecast,
+  fetchSolarWindData,
+  fetchMagnetometerData,
+  fetchKpIndex,
+  SolarWindData,
+  MagnetometerData,
+  KpIndex,
+} from '../utils/noaaApi';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GraphSimulation'>;
 
 const { width } = Dimensions.get('window');
 const SCROLL_PAD = 20;
 const CARD_PAD = 20;
-// Chart width = screen - scroll padding both sides - card padding both sides
 const CHART_WIDTH = Math.max(width - SCROLL_PAD * 2 - CARD_PAD * 2, 200);
+const SAFE_CHART_BG = '#0D1117';
 
-// Types for API data
+// Available time windows
+const TIME_OPTIONS = ['6H', '1D', '3D', '7D'] as const;
+type TimeWindow = typeof TIME_OPTIONS[number];
+
+// How many points we downsample to for the chart
+const MAX_CHART_POINTS = 7;
+
+// Helpers
+const hoursForWindow = (w: TimeWindow): number => {
+  switch (w) {
+    case '6H':  return 6;
+    case '1D':  return 24;
+    case '3D':  return 72;
+    case '7D':  return 168;
+    default:    return 24;
+  }
+};
+
+/** Downsample an array to at most `n` evenly-spaced items. */
+function downsample<T>(arr: T[], n: number): T[] {
+  if (arr.length <= n) return arr;
+  const step = (arr.length - 1) / (n - 1);
+  const result: T[] = [];
+  for (let i = 0; i < n; i++) result.push(arr[Math.round(i * step)]);
+  return result;
+}
+
+/** Create human-readable labels for chart x-axis. */
+function timeLabels(count: number, windowHours: number): string[] {
+  const labels: string[] = [];
+  const step = windowHours / (count - 1);
+  for (let i = 0; i < count; i++) {
+    const hoursAgo = windowHours - i * step;
+    if (hoursAgo <= 0) { labels.push('Now'); continue; }
+    if (hoursAgo < 1)  { labels.push(`${Math.round(hoursAgo * 60)}m`); continue; }
+    if (hoursAgo < 48)  { labels.push(`-${Math.round(hoursAgo)}h`); continue; }
+    labels.push(`-${(hoursAgo / 24).toFixed(0)}d`);
+  }
+  return labels;
+}
+
+// Types for processed data
 interface SolarData {
   currentCME: {
     speed: string;
@@ -85,37 +135,86 @@ interface SolarData {
 }
 
 export default function GraphSimulationScreen({ navigation }: Props) {
-  const [activeFilter, setActiveFilter] = useState('1D');
-  const [activeTab, setActiveTab] = useState<'summary' | 'details'>('summary');
+  const [activeFilter, setActiveFilter] = useState<TimeWindow>('1D');
 
-  // Simulation State
+  // Simulation
   const [isPlaying, setIsPlaying] = useState(false);
-  const [simulationSpeed, setSimulationSpeed] = useState(1);
-  const simulationProgress = useRef(new Animated.Value(0)).current;
+  const [simIndex, setSimIndex] = useState(0);
+  const playTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Real data states
+  // Real data stores
   const [isLoading, setIsLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
-  const [chartData, setChartData] = useState<number[]>([400, 420, 440, 430, 460, 450, 480]);
+
+  // Raw NOAA time-series (7-day, reused for all windows)
+  const [windHistory, setWindHistory] = useState<SolarWindData[]>([]);
+  const [magHistory, setMagHistory] = useState<MagnetometerData[]>([]);
+  const [kpHistory, setKpHistory] = useState<KpIndex[]>([]);
 
   const [solarData, setSolarData] = useState<SolarData>({
-    currentCME: { speed: '--', direction: '--', intensity: '--', arrivalTime: '--', confidence: '--' },
-    solarWind: { speed: '--', density: '--', temperature: '--', magneticField: '--' },
-    spaceWeather: { geomagneticActivity: '--', solarFlareProbability: '--', auroraVisibility: '--', satelliteRisk: '--', kpIndex: 0 }
+    currentCME:  { speed: '--', direction: '--', intensity: '--', arrivalTime: '--', confidence: '--' },
+    solarWind:   { speed: '--', density: '--', temperature: '--', magneticField: '--' },
+    spaceWeather:{ geomagneticActivity: '--', solarFlareProbability: '--', auroraVisibility: '--', satelliteRisk: '--', kpIndex: 0 }
   });
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
 
-  // Fetch real data from APIs
+  // -------------------------------------------------------------------
+  // Derive chart data from raw history + selected time window
+  // -------------------------------------------------------------------
+  const windowHours = hoursForWindow(activeFilter);
+  const cutoff = new Date(Date.now() - windowHours * 3600_000);
+
+  const filteredWind = windHistory.filter(d => new Date(d.time_tag) >= cutoff);
+  const speedSampled = downsample(filteredWind, MAX_CHART_POINTS);
+
+  const speedValues = speedSampled.length > 0
+    ? speedSampled.map(d => d.speed)
+    : [0];
+  const speedLabels = speedSampled.length > 0
+    ? timeLabels(speedSampled.length, windowHours)
+    : ['--'];
+
+  // Kp data — already at 3-hour cadence, keep all within window
+  const filteredKp = kpHistory.filter(d => new Date(d.time_tag) >= cutoff);
+  const kpSampled = downsample(filteredKp, MAX_CHART_POINTS);
+  const kpValues = kpSampled.length > 0 ? kpSampled.map(d => d.kp_index) : [0];
+  const kpLabels = kpSampled.length > 0
+    ? kpSampled.map(d => {
+        const dt = new Date(d.time_tag);
+        return `${dt.getUTCHours().toString().padStart(2, '0')}:${dt.getUTCMinutes().toString().padStart(2, '0')}`;
+      })
+    : ['--'];
+
+  // Color each Kp bar by severity
+  const kpBarColors = kpValues.map(v => {
+    if (v >= 7) return () => 'rgba(220,38,38,0.9)';   // red
+    if (v >= 5) return () => 'rgba(250,204,21,0.9)';   // yellow
+    if (v >= 3) return () => 'rgba(129,140,248,0.9)';  // indigo
+    return () => 'rgba(59,130,246,0.85)';               // blue
+  });
+
+  // -------------------------------------------------------------------
+  // Fetch all NOAA + NASA data
+  // -------------------------------------------------------------------
   const fetchRealData = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const [nasaData, noaaData] = await Promise.all([
+      const [nasaData, noaaData, windRaw, magRaw, kpRaw] = await Promise.all([
         getSpaceWeatherSummary(),
         getRealTimeSolarWindSummary(),
+        fetchSolarWindData(),
+        fetchMagnetometerData(),
+        fetchKpIndex(),
       ]);
+
+      // Store raw arrays
+      if (windRaw?.length) setWindHistory(windRaw);
+      if (magRaw?.length)  setMagHistory(magRaw);
+      if (kpRaw?.length)   setKpHistory(kpRaw);
 
       if (noaaData) {
         const auroraInfo = getAuroraForecast(noaaData.geomagnetic.kpIndex);
@@ -137,21 +236,17 @@ export default function GraphSimulationScreen({ navigation }: Props) {
           solarWind: {
             speed: `${Math.round(noaaData.current.speed)} km/s`,
             density: `${noaaData.current.density.toFixed(1)} p/cm³`,
-            temperature: `${(noaaData.current.temperature / 1000000).toFixed(2)}Mk`,
+            temperature: `${(noaaData.current.temperature / 1_000_000).toFixed(2)} MK`,
             magneticField: `${noaaData.current.magneticField.toFixed(1)} nT`
           },
           spaceWeather: {
             geomagneticActivity: noaaData.geomagnetic.activity,
             solarFlareProbability: nasaData?.totalFlares ? 'Elevated' : 'Low',
             auroraVisibility: auroraInfo.visibility,
-            satelliteRisk: satelliteRisk,
+            satelliteRisk,
             kpIndex: noaaData.geomagnetic.kpIndex
           }
         });
-
-        // Mock chart update based on real speed
-        const currentSpeed = noaaData.current.speed;
-        setChartData(prev => [...prev.slice(1), currentSpeed]);
 
         setIsConnected(true);
         setLastUpdated(new Date().toLocaleTimeString());
@@ -168,7 +263,6 @@ export default function GraphSimulationScreen({ navigation }: Props) {
     fetchRealData();
     const refreshInterval = setInterval(fetchRealData, 5 * 60 * 1000);
 
-    // Entrance
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
@@ -177,22 +271,37 @@ export default function GraphSimulationScreen({ navigation }: Props) {
     return () => clearInterval(refreshInterval);
   }, [fetchRealData]);
 
-  const toggleSimulation = () => {
-    setIsPlaying(!isPlaying);
-    // Add logic to animate graph or progress bar
+  // -------------------------------------------------------------------
+  // Simulation play / pause — auto-advances through chart points
+  // -------------------------------------------------------------------
+  useEffect(() => {
+    if (isPlaying) {
+      playTimer.current = setInterval(() => {
+        setSimIndex(prev => {
+          const max = speedSampled.length - 1;
+          if (prev >= max) { setIsPlaying(false); return max; }
+          return prev + 1;
+        });
+      }, 1200); // 1.2 s per step
+    } else if (playTimer.current) {
+      clearInterval(playTimer.current);
+      playTimer.current = null;
+    }
+    return () => { if (playTimer.current) clearInterval(playTimer.current); };
+  }, [isPlaying, speedSampled.length]);
+
+  const resetSimulation = () => {
+    setIsPlaying(false);
+    setSimIndex(0);
   };
 
-  const getChartData = () => {
-    return {
-      labels: ['00', '04', '08', '12', '16', '20', '24'],
-      datasets: [{
-        data: chartData,
-        color: (opacity = 1) => `rgba(0, 198, 255, ${opacity})`,
-        strokeWidth: 3
-      }]
-    };
-  };
+  const simProgress = speedSampled.length > 1
+    ? (simIndex / (speedSampled.length - 1)) * 100
+    : 0;
 
+  // -------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------
   return (
     <ParticleBackground>
       <SafeAreaView style={styles.safeArea}>
@@ -200,7 +309,7 @@ export default function GraphSimulationScreen({ navigation }: Props) {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Header */}
-          <BlurView intensity={20} tint="dark" style={styles.header}>
+          <GlassCard style={styles.header}>
             <View style={styles.headerContent}>
               <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
                 <ChevronRight size={24} color="#FFF" style={{ transform: [{ rotate: '180deg' }] }} />
@@ -210,156 +319,172 @@ export default function GraphSimulationScreen({ navigation }: Props) {
                 <RefreshCw size={20} color={isLoading ? APP_CONFIG.colors.text.secondary : APP_CONFIG.colors.accent} />
               </TouchableOpacity>
             </View>
-          </BlurView>
+          </GlassCard>
 
-          {/* Main Graph Card */}
+          {/* ── Solar Wind Velocity (Real NOAA Time-Series) ── */}
           <Animated.View style={[styles.mainGraphCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <BlurView intensity={30} tint="dark" style={styles.glassCard}>
+            <GlassCard style={styles.glassCard}>
               <View style={styles.cardHeader}>
                 <View>
                   <Text style={styles.cardTitle}>Solar Wind Velocity</Text>
-                  <Text style={styles.cardSubtitle}>Real-time SWIS Data Stream</Text>
+                  <Text style={styles.cardSubtitle}>
+                    {isConnected
+                      ? `NOAA DSCOVR · last ${windowHours}h · updated ${lastUpdated}`
+                      : 'Waiting for NOAA DSCOVR data…'}
+                  </Text>
                 </View>
-                <View style={styles.liveBadge}>
-                  <View style={styles.blinkDot} />
-                  <Text style={styles.liveText}>LIVE</Text>
-                </View>
+                {isConnected && (
+                  <View style={styles.liveBadge}>
+                    <View style={styles.blinkDot} />
+                    <Text style={styles.liveText}>LIVE</Text>
+                  </View>
+                )}
               </View>
 
-              <LineChart
-                data={getChartData()}
-                width={CHART_WIDTH}
-                height={220}
-                yAxisSuffix=" km/s"
-                chartConfig={{
-                  backgroundColor: '#0F172A',
-                  backgroundGradientFrom: '#0F172A',
-                  backgroundGradientTo: '#1E293B',
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(0, 198, 255, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                  style: { borderRadius: 16 },
-                  propsForDots: { r: "4", strokeWidth: "2", stroke: APP_CONFIG.colors.accent }
-                }}
-                bezier
-                style={styles.chart}
-              />
+              {isLoading && windHistory.length === 0 ? (
+                <View style={{ height: 220, justifyContent: 'center', alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color={APP_CONFIG.colors.accent} />
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', marginTop: 8 }}>Fetching DSCOVR data…</Text>
+                </View>
+              ) : (
+                <LineChart
+                  data={{
+                    labels: speedLabels,
+                    datasets: [{
+                      data: speedValues,
+                      color: (opacity = 1) => `rgba(0, 198, 255, ${opacity})`,
+                      strokeWidth: 3,
+                    }],
+                  }}
+                  width={CHART_WIDTH}
+                  height={220}
+                  yAxisSuffix=" km/s"
+                  chartConfig={{
+                    backgroundColor: SAFE_CHART_BG,
+                    backgroundGradientFrom: SAFE_CHART_BG,
+                    backgroundGradientTo: SAFE_CHART_BG,
+                    decimalPlaces: 0,
+                    color: (opacity = 1) => `rgba(0, 198, 255, ${opacity})`,
+                    labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                    style: { borderRadius: 16 },
+                    propsForDots: { r: '4', strokeWidth: '2', stroke: APP_CONFIG.colors.accent },
+                  }}
+                  bezier
+                  style={styles.chart}
+                />
+              )}
 
-              {/* Secondary bar chart for Kp index & variability */}
+              {/* ── Kp Index (Real NOAA History) ── */}
               <View style={styles.secondaryChartSection}>
                 <View style={styles.secondaryHeader}>
                   <Text style={styles.secondaryTitle}>Geomagnetic Activity (Kp)</Text>
                   <Text style={styles.secondarySubtitle}>
-                    Last 7 checkpoints · Current Kp: {solarData.spaceWeather.kpIndex || 0}
+                    {kpSampled.length} readings · Current Kp: {solarData.spaceWeather.kpIndex || 0}
                   </Text>
                 </View>
-                <BarChart
-                  data={{
-                    labels: ['-18h', '-15h', '-12h', '-9h', '-6h', '-3h', 'Now'],
-                    datasets: [
-                      {
-                        data: [
-                          Math.max(0, (solarData.spaceWeather.kpIndex || 3) - 2),
-                          Math.max(0, (solarData.spaceWeather.kpIndex || 3) - 1.5),
-                          Math.max(0, (solarData.spaceWeather.kpIndex || 3) - 1),
-                          solarData.spaceWeather.kpIndex || 3,
-                          Math.min(9, (solarData.spaceWeather.kpIndex || 3) + 0.5),
-                          Math.min(9, (solarData.spaceWeather.kpIndex || 3) + 1),
-                          solarData.spaceWeather.kpIndex || 3,
-                        ],
-                        colors: [
-                          () => 'rgba(59,130,246,0.85)',
-                          () => 'rgba(59,130,246,0.85)',
-                          () => 'rgba(129,140,248,0.9)',
-                          () => 'rgba(56,189,248,0.95)',
-                          () => 'rgba(250,204,21,0.95)',
-                          () => 'rgba(248,113,113,0.95)',
-                          () => 'rgba(248,113,113,0.95)',
-                        ],
-                      } as any,
-                    ],
-                  }}
-                  width={CHART_WIDTH}
-                  height={170}
-                  yAxisLabel=""
-                  yAxisSuffix=""
-                  chartConfig={{
-                    backgroundColor: '#0F172A',
-                    backgroundGradientFrom: '#0F172A',
-                    backgroundGradientTo: '#1E293B',
-                    decimalPlaces: 0,
-                    color: (opacity = 1) => `rgba(255,255,255,${opacity})`,
-                    labelColor: (opacity = 1) => `rgba(148,163,184,${opacity})`,
-                    barPercentage: 0.6,
-                  }}
-                  style={styles.secondaryChart}
-                  fromZero
-                  withInnerLines={false}
-                />
+
+                {kpValues.length > 0 && kpValues[0] !== 0 ? (
+                  <BarChart
+                    data={{
+                      labels: kpLabels,
+                      datasets: [{ data: kpValues, colors: kpBarColors } as any],
+                    }}
+                    width={CHART_WIDTH}
+                    height={170}
+                    yAxisLabel=""
+                    yAxisSuffix=""
+                    chartConfig={{
+                      backgroundColor: SAFE_CHART_BG,
+                      backgroundGradientFrom: SAFE_CHART_BG,
+                      backgroundGradientTo: SAFE_CHART_BG,
+                      decimalPlaces: 0,
+                      color: (opacity = 1) => `rgba(255,255,255,${opacity})`,
+                      labelColor: (opacity = 1) => `rgba(148,163,184,${opacity})`,
+                      barPercentage: 0.6,
+                    }}
+                    style={styles.secondaryChart}
+                    fromZero
+                    withInnerLines={false}
+                  />
+                ) : (
+                  <View style={{ height: 170, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ color: 'rgba(255,255,255,0.4)' }}>No Kp data for this window</Text>
+                  </View>
+                )}
               </View>
 
-              {/* Time Filters */}
+              {/* Time window selector */}
               <View style={styles.filterRow}>
-                {TIME_FILTERS.map(filter => (
+                {TIME_OPTIONS.map(opt => (
                   <TouchableOpacity
-                    key={filter}
-                    onPress={() => setActiveFilter(filter)}
-                    style={[styles.filterChip, activeFilter === filter && styles.activeFilter]}
+                    key={opt}
+                    onPress={() => { setActiveFilter(opt); resetSimulation(); }}
+                    style={[styles.filterChip, activeFilter === opt && styles.activeFilter]}
                   >
-                    <Text style={[styles.filterText, activeFilter === filter && styles.activeFilterText]}>{filter}</Text>
+                    <Text style={[styles.filterText, activeFilter === opt && styles.activeFilterText]}>{opt}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-            </BlurView>
+            </GlassCard>
           </Animated.View>
 
-          {/* Simulation Controls */}
+          {/* ── Simulation Controls ── */}
           <Animated.View style={[styles.controlPanel, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <BlurView intensity={20} tint="light" style={styles.controlGlass}>
+            <GlassCard style={styles.controlGlass}>
               <View style={styles.controlRow}>
-                <TouchableOpacity style={styles.controlBtn} onPress={toggleSimulation}>
-                  {isPlaying ? <Pause size={24} color="#FFF" /> : <Play size={24} color="#FFF" style={{ marginLeft: 4 }} />}
+                <TouchableOpacity
+                  style={styles.controlBtn}
+                  onPress={() => setIsPlaying(p => !p)}
+                >
+                  {isPlaying
+                    ? <Pause size={24} color="#FFF" />
+                    : <Play size={24} color="#FFF" style={{ marginLeft: 4 }} />}
                 </TouchableOpacity>
 
                 <View style={styles.progressContainer}>
-                  <Text style={styles.progressLabel}>Simulation Timeline</Text>
+                  <Text style={styles.progressLabel}>
+                    Simulation Timeline
+                    {simIndex > 0 && speedSampled.length > 0 && speedSampled[simIndex]
+                      ? ` — ${Math.round(speedSampled[simIndex].speed)} km/s`
+                      : ''}
+                  </Text>
                   <View style={styles.progressBar}>
-                    <View style={[styles.progressFill, { width: '30%' }]} />
+                    <View style={[styles.progressFill, { width: `${simProgress}%` as any }]} />
                   </View>
                 </View>
 
-                <TouchableOpacity style={styles.controlBtnSmall}>
+                <TouchableOpacity style={styles.controlBtnSmall} onPress={resetSimulation}>
                   <RotateCcw size={16} color="#FFF" />
                 </TouchableOpacity>
               </View>
-            </BlurView>
+            </GlassCard>
           </Animated.View>
 
-          {/* Metrics Grid */}
+          {/* ── Live Metrics Grid ── */}
           <View style={styles.metricsGrid}>
-            <BlurView intensity={20} tint="dark" style={styles.metricCard}>
+            <GlassCard style={styles.metricCard}>
               <Wind size={20} color={APP_CONFIG.colors.info} style={styles.metricIcon} />
               <Text style={styles.metricValue}>{solarData.solarWind.speed}</Text>
               <Text style={styles.metricLabel}>Wind Speed</Text>
-            </BlurView>
-            <BlurView intensity={20} tint="dark" style={styles.metricCard}>
+            </GlassCard>
+            <GlassCard style={styles.metricCard}>
               <Thermometer size={20} color={APP_CONFIG.colors.warning} style={styles.metricIcon} />
               <Text style={styles.metricValue}>{solarData.solarWind.temperature}</Text>
               <Text style={styles.metricLabel}>Temperature</Text>
-            </BlurView>
-            <BlurView intensity={20} tint="dark" style={styles.metricCard}>
+            </GlassCard>
+            <GlassCard style={styles.metricCard}>
               <Activity size={20} color={APP_CONFIG.colors.success} style={styles.metricIcon} />
               <Text style={styles.metricValue}>{solarData.solarWind.density}</Text>
               <Text style={styles.metricLabel}>Density</Text>
-            </BlurView>
-            <BlurView intensity={20} tint="dark" style={styles.metricCard}>
+            </GlassCard>
+            <GlassCard style={styles.metricCard}>
               <Magnet size={20} color={APP_CONFIG.colors.accent} style={styles.metricIcon} />
               <Text style={styles.metricValue}>{solarData.solarWind.magneticField}</Text>
               <Text style={styles.metricLabel}>B-Field</Text>
-            </BlurView>
+            </GlassCard>
           </View>
 
-          {/* Detailed Data Section */}
+          {/* ── Impact Analysis ── */}
           <Animated.View style={[styles.detailsCard, { opacity: fadeAnim }]}>
             <LinearGradient
               colors={['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
@@ -382,9 +507,24 @@ export default function GraphSimulationScreen({ navigation }: Props) {
               <View style={styles.detailDivider} />
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Satellite Risk</Text>
-                <Text style={[styles.detailValue, { color: solarData.spaceWeather.satelliteRisk === 'High' ? APP_CONFIG.colors.warning : APP_CONFIG.colors.success }]}>
+                <Text style={[styles.detailValue,
+                  { color: solarData.spaceWeather.satelliteRisk === 'High'
+                      ? APP_CONFIG.colors.warning
+                      : APP_CONFIG.colors.success }]}>
                   {solarData.spaceWeather.satelliteRisk}
                 </Text>
+              </View>
+              <View style={styles.detailDivider} />
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Data Points Loaded</Text>
+                <Text style={styles.detailValue}>
+                  {windHistory.length} wind · {kpHistory.length} Kp
+                </Text>
+              </View>
+              <View style={styles.detailDivider} />
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Source</Text>
+                <Text style={styles.detailValue}>NOAA SWPC / NASA DONKI</Text>
               </View>
             </LinearGradient>
           </Animated.View>
