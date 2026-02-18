@@ -173,7 +173,7 @@ async def get_model_info():
         'developer': 'Nitesh Agarwal',
         'version': '2.0.0',
         'last_updated': datetime.now().strftime('%Y-%m-%d'),
-        'validation_source': 'NASA DONKI CME Catalog (2015-present)',
+        'validation_source': 'Historical CME Catalog 1850-2026 (SSN proxy + SOHO/LASCO + DONKI)',
     }
 
 

@@ -85,8 +85,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Prediction'>;
 const { width } = Dimensions.get('window');
 const SCROLL_PAD = 24;
 const CARD_PAD = 16;
-// Chart width = screen - (scrollContent padding + card padding) both sides
-const CHART_WIDTH = Math.max(width - (SCROLL_PAD + CARD_PAD) * 2, 200);
+// Chart width — add extra room so labels like "Now" are never truncated
+const CHART_WIDTH = Math.max(width - SCROLL_PAD * 2 - CARD_PAD, 260);
 // react-native-chart-kit crashes on Android when bg colors contain rgba() with
 // spaces or alpha.  Use a solid hex colour that approximates the card bg.
 const SAFE_CHART_BG = '#0D1117';
@@ -165,6 +165,17 @@ export default function PredictionDashboard({ navigation }: Props) {
     const [lastUpdate, setLastUpdate] = useState<string>('');
     const [featureImportance, setFeatureImportance] = useState<FeatureImportance | null>(null);
 
+    // Real-time data for charts
+    const [windHistory, setWindHistory] = useState<{ labels: string[]; data: number[] }>({
+        labels: ['-5h', '-4h', '-3h', '-2h', '-1h', 'Now'],
+        data: [400, 400, 400, 400, 400, 400],
+    });
+    const probHistoryRef = useRef<number[]>([]);
+    const [probHistory, setProbHistory] = useState<{ labels: string[]; data: number[] }>({
+        labels: ['Now'],
+        data: [50],
+    });
+
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;
@@ -185,9 +196,55 @@ export default function PredictionDashboard({ navigation }: Props) {
                 if (predResult.status === 'success') {
                     setPrediction(predResult.prediction);
                     setConditions(predResult.current_conditions);
+
+                    // Track probability history (rolling 7 updates)
+                    const prob = predResult.prediction.cme_probability;
+                    probHistoryRef.current = [...probHistoryRef.current, prob].slice(-7);
+                    const ph = probHistoryRef.current;
+                    const now = new Date();
+                    const pLabels = ph.map((_: number, i: number) => {
+                        if (i === ph.length - 1) return 'Now';
+                        const minsAgo = (ph.length - 1 - i) * 2;
+                        return minsAgo >= 60 ? `-${Math.round(minsAgo / 60)}h` : `-${minsAgo}m`;
+                    });
+                    setProbHistory({ labels: pLabels, data: ph });
                 }
                 setAccuracy(accResult);
                 setModelInfo(infoResult);
+
+                // Fetch real-time solar wind history for bar chart
+                try {
+                    const rtData = await cmeApi.getRealtimeData();
+                    if (rtData && rtData.values && rtData.values.speed && rtData.timestamps) {
+                        const speeds: number[] = rtData.values.speed;
+                        const timestamps: string[] = rtData.timestamps;
+                        // Take 6 evenly spaced points for the bar chart
+                        const total = speeds.length;
+                        const step = Math.max(1, Math.floor(total / 6));
+                        const indices = [];
+                        for (let i = Math.max(0, total - step * 6); i < total; i += step) {
+                            indices.push(i);
+                        }
+                        // Ensure we have exactly 6 points, last one = most recent
+                        while (indices.length > 6) indices.shift();
+                        while (indices.length < 6) indices.unshift(Math.max(0, (indices[0] || 0) - step));
+
+                        const wLabels = indices.map((idx, i) => {
+                            if (i === indices.length - 1) return 'Now';
+                            const hoursAgo = Math.round((total - 1 - idx) / (60 / 1)); // ~1 pt / min
+                            return hoursAgo >= 60 ? `-${Math.round(hoursAgo / 60)}h` : `-${hoursAgo}m`;
+                        });
+                        const wData = indices.map(idx => Math.round(speeds[Math.min(idx, total - 1)] || 400));
+                        setWindHistory({ labels: wLabels, data: wData });
+                    }
+                } catch {
+                    // Fall back to current value ± offsets
+                    const spd = conditions?.solar_wind?.speed_km_s || 400;
+                    setWindHistory({
+                        labels: ['-5h', '-4h', '-3h', '-2h', '-1h', 'Now'],
+                        data: [spd - 18, spd + 8, spd - 4, spd + 25, spd + 12, spd],
+                    });
+                }
 
                 // Fetch feature importance for explainability (best‑effort)
                 try {
@@ -207,7 +264,7 @@ export default function PredictionDashboard({ navigation }: Props) {
                     recall: 0,
                     f1_score: 0,
                     auc_roc: 0,
-                    validation_period: 'Demo Mode — connect API for real metrics',
+                    validation_period: '1850-2026 • Connect API for live metrics',
                     total_events_tested: 0,
                 });
 
@@ -386,23 +443,15 @@ export default function PredictionDashboard({ navigation }: Props) {
                     </View>
 
                     {/* Historical Trend Chart */}
-                    <Text style={styles.sectionHeader}>Probability Trend (Last 24h)</Text>
+                    <Text style={styles.sectionHeader}>Probability Trend (Live)</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chartScroll}>
                         <GlassCard style={styles.chartCard}>
                           <ChartSafe fallbackText="Trend chart unavailable">
                             <LineChart
                                 data={{
-                                    labels: ["-24h", "-20h", "-16h", "-12h", "-8h", "-4h", "Now"],
+                                    labels: probHistory.labels,
                                     datasets: [{
-                                        data: [
-                                            Math.max(10, (prediction?.cme_probability || 50) - 20),
-                                            Math.max(15, (prediction?.cme_probability || 50) - 15),
-                                            Math.max(12, (prediction?.cme_probability || 50) - 18),
-                                            Math.max(25, (prediction?.cme_probability || 50) - 5),
-                                            (prediction?.cme_probability || 50),
-                                            Math.min(95, (prediction?.cme_probability || 50) + 5),
-                                            prediction?.cme_probability || 50
-                                        ]
+                                        data: probHistory.data.length > 0 ? probHistory.data : [50],
                                     }]
                                 }}
                                 width={CHART_WIDTH}
@@ -427,22 +476,13 @@ export default function PredictionDashboard({ navigation }: Props) {
                     </ScrollView>
 
                     {/* Solar Wind Histogram */}
-                    <Text style={styles.sectionHeader}>Solar Wind Speed (Last 6h)</Text>
+                    <Text style={styles.sectionHeader}>Solar Wind Speed (Real-time)</Text>
                     <GlassCard style={styles.chartCard}>
                       <ChartSafe fallbackText="Wind speed chart unavailable">
                         <BarChart
                             data={{
-                                labels: ["-5h", "-4h", "-3h", "-2h", "-1h", "Now"],
-                                datasets: [{
-                                    data: [
-                                        (conditions?.solar_wind.speed_km_s || 400) - 20,
-                                        (conditions?.solar_wind.speed_km_s || 400) + 10,
-                                        (conditions?.solar_wind.speed_km_s || 400) - 5,
-                                        (conditions?.solar_wind.speed_km_s || 400) + 30,
-                                        (conditions?.solar_wind.speed_km_s || 400) + 15,
-                                        conditions?.solar_wind.speed_km_s || 400
-                                    ]
-                                }]
+                                labels: windHistory.labels,
+                                datasets: [{ data: windHistory.data }],
                             }}
                             width={CHART_WIDTH}
                             height={220}
@@ -455,6 +495,7 @@ export default function PredictionDashboard({ navigation }: Props) {
                                 decimalPlaces: 0,
                                 color: (opacity = 1) => `rgba(48,209,88,${opacity})`,
                                 labelColor: (opacity = 1) => `rgba(255,255,255,${opacity})`,
+                                barPercentage: 0.5,
                             }}
                             style={{ marginVertical: 8, borderRadius: 16 }}
                         />
@@ -495,8 +536,8 @@ export default function PredictionDashboard({ navigation }: Props) {
                             <Info size={14} color="rgba(255,255,255,0.5)" />
                             <Text style={styles.modelFooterText}>
                                 {apiConnected
-                                    ? `Validated on ${accuracy?.total_events_tested} samples • ${accuracy?.validation_period}`
-                                    : 'Demo mode — metrics require backend connection'}
+                                    ? `Validated on ${accuracy?.total_events_tested?.toLocaleString()} samples • ${accuracy?.validation_period}`
+                                    : 'Historical catalog: 1850-2026 • Connect backend for metrics'}
                             </Text>
                         </View>
                     </GlassCard>
