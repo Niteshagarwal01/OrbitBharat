@@ -10,64 +10,29 @@ import {
     RefreshControl,
     Animated,
     Dimensions,
-    Platform,
 } from 'react-native';
 import {
     Clock,
-    Gauge,
     Activity,
     Magnet,
     AlertTriangle,
-    CheckCircle,
     Info,
     Share2,
-    Database,
     Cpu,
     Zap,
     Wind,
-    Thermometer,
     BarChart2,
-    Shield
+    Shield,
 } from 'lucide-react-native';
-import {
-    LineChart,
-    BarChart,
-} from "react-native-chart-kit";
-
-/** Lightweight error boundary that swallows chart‑rendering crashes */
-interface ChartSafeProps { children: ReactNode; fallbackText?: string; }
-interface ChartSafeState { crashed: boolean; }
-class ChartSafe extends Component<ChartSafeProps, ChartSafeState> {
-    constructor(props: ChartSafeProps) { super(props); this.state = { crashed: false }; }
-    static getDerivedStateFromError(): ChartSafeState { return { crashed: true }; }
-    componentDidCatch(e: Error, info: ErrorInfo) { console.warn('ChartSafe caught', e.message); }
-    render() {
-        if (this.state.crashed) {
-            return (
-                <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center', minHeight: 120 }}>
-                    <AlertTriangle size={28} color="#FF9500" />
-                    <Text style={{ color: '#94A3B8', marginTop: 8, fontSize: 12 }}>
-                        {this.props.fallbackText || 'Chart unavailable on this device'}
-                    </Text>
-                </View>
-            );
-        }
-        return this.props.children;
-    }
-}
+import { LineChart, BarChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-// BlurView crashes on many Android devices — use a plain semi-transparent View
-const GlassCard = ({ children, style, ...rest }: any) => (
-    <View style={[{ backgroundColor: 'rgba(13,17,23,0.85)', borderRadius: 18, overflow: 'hidden' }, style]} {...rest}>
-        {children}
-    </View>
-);
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
 import ParticleBackground from '../components/ParticleBackground';
 import Header from '../components/Header';
 import SeverityBar from '../components/SeverityBar';
+import GlassCard from '../components/GlassCard';
 import { APP_CONFIG } from '../utils/constants';
 import {
     cmeApi,
@@ -77,83 +42,108 @@ import {
     SpaceConditions,
     ModelInfo,
     AccuracyMetrics,
-    FeatureImportance
+    FeatureImportance,
 } from '../utils/cmePredictionApi';
 
+/* ─── Chart error boundary ─────────────────────────────────────────── */
+interface ChartSafeProps { children: ReactNode; fallbackText?: string }
+interface ChartSafeState { crashed: boolean }
+class ChartSafe extends Component<ChartSafeProps, ChartSafeState> {
+    constructor(p: ChartSafeProps) { super(p); this.state = { crashed: false }; }
+    static getDerivedStateFromError(): ChartSafeState { return { crashed: true }; }
+    componentDidCatch(e: Error) { console.warn('ChartSafe caught', e.message); }
+    render() {
+        if (this.state.crashed) {
+            return (
+                <View style={{ padding: 20, alignItems: 'center', justifyContent: 'center', minHeight: 100 }}>
+                    <AlertTriangle size={24} color="#FF9500" />
+                    <Text style={{ color: '#94A3B8', marginTop: 6, fontSize: 12 }}>
+                        {this.props.fallbackText || 'Chart unavailable'}
+                    </Text>
+                </View>
+            );
+        }
+        return this.props.children;
+    }
+}
+
+/* ─── Constants ─────────────────────────────────────────────────────── */
 type Props = NativeStackScreenProps<RootStackParamList, 'Prediction'>;
 
-const { width } = Dimensions.get('window');
-const SCROLL_PAD = 24;
-const CARD_PAD = 16;
-// Chart width — add extra room so labels like "Now" are never truncated
-const CHART_WIDTH = Math.max(width - SCROLL_PAD * 2 - CARD_PAD, 260);
-// react-native-chart-kit crashes on Android when bg colors contain rgba() with
-// spaces or alpha.  Use a solid hex colour that approximates the card bg.
-const SAFE_CHART_BG = '#0D1117';
+const SCREEN_W = Dimensions.get('window').width;
+const H_PAD = 20;
+const CHART_W = SCREEN_W - H_PAD * 2 - 24;
+const CHART_BG = '#0D1117';
 
-// Alert level colors - Blue palette based
-const getAlertColor = (level: string): [string, string] => {
-    switch (level) {
-        case 'EXTREME': return ['#FF3B30', '#CC0000'];
-        case 'HIGH': return ['#FF9500', '#CC7000'];
-        case 'MODERATE': return ['#0066FF', '#0044CC'];
-        case 'LOW': return ['#00A3FF', '#0077CC'];
-        default: return ['#3399FF', '#0066FF'];
-    }
+const ALERT_COLORS: Record<string, [string, string]> = {
+    EXTREME: ['#FF3B30', '#CC0000'],
+    HIGH: ['#FF9500', '#CC7000'],
+    MODERATE: ['#0066FF', '#0044CC'],
+    LOW: ['#00A3FF', '#0077CC'],
+    NONE: ['#3399FF', '#0066FF'],
 };
 
+/* ─── Small metric card ────────────────────────────────────────────── */
 const MetricCard = ({ icon: Icon, label, value, unit, color }: any) => (
-    <GlassCard style={styles.metricCard}>
-        <View style={[styles.iconContainer, { backgroundColor: `${color}20` }]}>
-            <Icon size={20} color={color} />
+    <GlassCard style={s.metricCard}>
+        <View style={[s.metricIcon, { backgroundColor: color + '20' }]}>
+            <Icon size={18} color={color} />
         </View>
-        <Text style={styles.metricValue}>{value ?? '--'}<Text style={styles.metricUnit}>{unit}</Text></Text>
-        <Text style={styles.metricLabel}>{label}</Text>
+        <Text style={s.metricValue}>
+            {value ?? '--'}
+            <Text style={s.metricUnit}>{unit}</Text>
+        </Text>
+        <Text style={s.metricLabel}>{label}</Text>
     </GlassCard>
 );
 
-const buildNarrativeSummary = (
+/* ─── Narrative summary builder ────────────────────────────────────── */
+const buildSummary = (
     pred: CMEPrediction | null,
     cond: SpaceConditions | null,
-    connected: boolean
+    connected: boolean,
 ) => {
-    if (!pred || !cond) {
+    if (!pred || !cond)
         return connected
             ? 'Fetching latest CME risk from the ML backend...'
-            : 'Showing demo prediction – ML backend not connected.';
-    }
+            : 'Demo prediction - ML backend not connected.';
 
-    const level = pred.alert_level;
     const prob = pred.cme_probability;
     const wind = cond.solar_wind.speed_km_s ?? 0;
     const bz = cond.magnetic_field.bz_nT ?? 0;
+    const level = pred.alert_level;
 
-    let impact: string;
-    if (level === 'EXTREME' || prob >= 80) {
-        impact = 'High geomagnetic storm risk – potential impact on navigation and power grids.';
-    } else if (level === 'HIGH' || prob >= 60) {
-        impact = 'Elevated storm risk – watch for navigation and communication disruptions.';
-    } else if (level === 'MODERATE' || prob >= 30) {
-        impact = 'Moderate risk – possible minor disturbances to satellites and GNSS.';
-    } else {
-        impact = 'Low risk – normal space‑weather conditions for most operations.';
-    }
+    const impact =
+        level === 'EXTREME' || prob >= 80
+            ? 'High geomagnetic storm risk - potential impact on navigation and power grids.'
+            : level === 'HIGH' || prob >= 60
+                ? 'Elevated storm risk - watch for navigation and communication disruptions.'
+                : level === 'MODERATE' || prob >= 30
+                    ? 'Moderate risk - possible minor disturbances to satellites and GNSS.'
+                    : 'Low risk - normal space-weather conditions.';
 
-    const windLabel =
+    const windTag =
         wind > 650 ? 'very fast solar wind' :
             wind > 500 ? 'fast solar wind' :
-                wind > 350 ? 'moderate solar wind' :
-                    'slow solar wind';
+                wind > 350 ? 'moderate solar wind' : 'slow solar wind';
 
-    const bzLabel =
-        bz < -5 ? 'strong southward IMF Bz (more coupling with Earth\'s field)' :
+    const bzTag =
+        bz < -5 ? 'strong southward IMF Bz' :
             bz < -1 ? 'slightly southward IMF Bz' :
-                bz > 2 ? 'northward IMF Bz (more shielding)' :
-                    'near‑neutral IMF Bz';
+                bz > 2 ? 'northward IMF Bz' : 'near-neutral IMF Bz';
 
-    return `${impact} Currently, CME impact probability is ${prob.toFixed(1)}% with ${windLabel} and ${bzLabel}.`;
+    return impact + ' CME impact probability ' + prob.toFixed(1) + '% with ' + windTag + ' and ' + bzTag + '.';
 };
 
+/* ─── Helpers ──────────────────────────────────────────────────────── */
+const safeData = (arr: number[], fallback = 0): number[] => {
+    if (!arr || arr.length === 0) return [fallback];
+    return arr.map(v => (Number.isFinite(v) ? v : fallback));
+};
+
+/* =================================================================== */
+/* COMPONENT                                                           */
+/* =================================================================== */
 export default function PredictionDashboard({ navigation }: Props) {
     const [prediction, setPrediction] = useState<CMEPrediction | null>(null);
     const [conditions, setConditions] = useState<SpaceConditions | null>(null);
@@ -162,127 +152,92 @@ export default function PredictionDashboard({ navigation }: Props) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [apiConnected, setApiConnected] = useState(false);
-    const [lastUpdate, setLastUpdate] = useState<string>('');
+    const [lastUpdate, setLastUpdate] = useState('');
     const [featureImportance, setFeatureImportance] = useState<FeatureImportance | null>(null);
 
-    // Real-time data for charts
-    const [windHistory, setWindHistory] = useState<{ labels: string[]; data: number[] }>({
+    const [windHistory, setWindHistory] = useState({
         labels: ['-5h', '-4h', '-3h', '-2h', '-1h', 'Now'],
-        data: [400, 400, 400, 400, 400, 400],
+        data: [400, 405, 398, 420, 412, 400],
     });
-    const probHistoryRef = useRef<number[]>([]);
-    const [probHistory, setProbHistory] = useState<{ labels: string[]; data: number[] }>({
-        labels: ['Now'],
-        data: [50],
-    });
+    const probRef = useRef<number[]>([]);
+    const [probHistory, setProbHistory] = useState({ labels: ['Now'], data: [50] });
 
-    // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(50)).current;
-    const gaugeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(40)).current;
 
+    /* ── Fetch ───────────────────────────────────────────────────── */
     const fetchData = useCallback(async () => {
         try {
             const healthy = await cmeApi.healthCheck();
             setApiConnected(healthy);
 
             if (healthy) {
-                const [predResult, accResult, infoResult] = await Promise.all([
+                const [predRes, accRes, infoRes] = await Promise.all([
                     cmeApi.getPrediction(),
                     cmeApi.getAccuracy(),
                     cmeApi.getModelInfo(),
                 ]);
 
-                if (predResult.status === 'success') {
-                    setPrediction(predResult.prediction);
-                    setConditions(predResult.current_conditions);
+                if (predRes.status === 'success') {
+                    setPrediction(predRes.prediction);
+                    setConditions(predRes.current_conditions);
 
-                    // Track probability history (rolling 7 updates)
-                    const prob = predResult.prediction.cme_probability;
-                    probHistoryRef.current = [...probHistoryRef.current, prob].slice(-7);
-                    const ph = probHistoryRef.current;
-                    const now = new Date();
-                    const pLabels = ph.map((_: number, i: number) => {
+                    const p = predRes.prediction.cme_probability;
+                    probRef.current = [...probRef.current, p].slice(-7);
+                    const ph = probRef.current;
+                    const labels = ph.map((_: number, i: number) => {
                         if (i === ph.length - 1) return 'Now';
-                        const minsAgo = (ph.length - 1 - i) * 2;
-                        return minsAgo >= 60 ? `-${Math.round(minsAgo / 60)}h` : `-${minsAgo}m`;
+                        const m = (ph.length - 1 - i) * 2;
+                        return m >= 60 ? '-' + Math.round(m / 60) + 'h' : '-' + m + 'm';
                     });
-                    setProbHistory({ labels: pLabels, data: ph });
+                    setProbHistory({ labels, data: ph });
                 }
-                setAccuracy(accResult);
-                setModelInfo(infoResult);
 
-                // Fetch real-time solar wind history for bar chart
+                setAccuracy(accRes);
+                setModelInfo(infoRes);
+
                 try {
-                    const rtData = await cmeApi.getRealtimeData();
-                    if (rtData && rtData.values && rtData.values.speed && rtData.timestamps) {
-                        const speeds: number[] = rtData.values.speed;
-                        const timestamps: string[] = rtData.timestamps;
-                        // Take 6 evenly spaced points for the bar chart
-                        const total = speeds.length;
-                        const step = Math.max(1, Math.floor(total / 6));
-                        const indices = [];
-                        for (let i = Math.max(0, total - step * 6); i < total; i += step) {
-                            indices.push(i);
+                    const rt = await cmeApi.getRealtimeData();
+                    if (rt?.values?.speed?.length) {
+                        const speeds: number[] = rt.values.speed;
+                        const n = speeds.length;
+                        const step = Math.max(1, Math.floor(n / 6));
+                        const pts: number[] = [];
+                        const lbl: string[] = [];
+                        for (let i = 0; i < 6; i++) {
+                            const idx = Math.min(Math.max(0, n - (6 - i) * step), n - 1);
+                            pts.push(Math.round(speeds[idx] || 400));
+                            if (i === 5) { lbl.push('Now'); }
+                            else {
+                                const ago = Math.round((n - 1 - idx) / 60);
+                                lbl.push(ago > 0 ? '-' + ago + 'h' : '-' + Math.round(n - 1 - idx) + 'm');
+                            }
                         }
-                        // Ensure we have exactly 6 points, last one = most recent
-                        while (indices.length > 6) indices.shift();
-                        while (indices.length < 6) indices.unshift(Math.max(0, (indices[0] || 0) - step));
-
-                        const wLabels = indices.map((idx, i) => {
-                            if (i === indices.length - 1) return 'Now';
-                            const hoursAgo = Math.round((total - 1 - idx) / (60 / 1)); // ~1 pt / min
-                            return hoursAgo >= 60 ? `-${Math.round(hoursAgo / 60)}h` : `-${hoursAgo}m`;
-                        });
-                        const wData = indices.map(idx => Math.round(speeds[Math.min(idx, total - 1)] || 400));
-                        setWindHistory({ labels: wLabels, data: wData });
+                        setWindHistory({ labels: lbl, data: pts });
                     }
-                } catch {
-                    // Fall back to current value ± offsets
-                    const spd = conditions?.solar_wind?.speed_km_s || 400;
-                    setWindHistory({
-                        labels: ['-5h', '-4h', '-3h', '-2h', '-1h', 'Now'],
-                        data: [spd - 18, spd + 8, spd - 4, spd + 25, spd + 12, spd],
-                    });
-                }
+                } catch { /* keep last */ }
 
-                // Fetch feature importance for explainability (best‑effort)
-                try {
-                    const fi = await cmeApi.getFeatureImportance();
-                    setFeatureImportance(fi);
-                } catch {
-                    setFeatureImportance(null);
-                }
+                try { setFeatureImportance(await cmeApi.getFeatureImportance()); } catch { setFeatureImportance(null); }
             } else {
                 const mock = getMockPrediction();
                 setPrediction(mock.prediction);
                 setConditions(mock.current_conditions);
                 setModelInfo(getMockModelInfo());
                 setAccuracy({
-                    accuracy: 0,
-                    precision: 0,
-                    recall: 0,
-                    f1_score: 0,
-                    auc_roc: 0,
-                    validation_period: '1850-2026 • Connect API for live metrics',
+                    accuracy: 0, precision: 0, recall: 0, f1_score: 0, auc_roc: 0,
+                    validation_period: '1850-2026 connect API for live metrics',
                     total_events_tested: 0,
                 });
-
-                // Mock feature importance in demo mode
                 setFeatureImportance({
-                    features: ['Solar Wind Speed', 'Proton Density', 'IMF Bz', 'IMF Bt', 'Plasma Beta', 'Temperature'],
-                    importance: [0.32, 0.21, 0.18, 0.12, 0.1, 0.07],
-                    top_features: [
-                        ['Solar Wind Speed', 0.32],
-                        ['Proton Density', 0.21],
-                        ['IMF Bz', 0.18],
-                    ],
+                    features: ['Solar Wind', 'Proton Density', 'IMF Bz', 'IMF Bt', 'Plasma Beta', 'Temperature'],
+                    importance: [0.32, 0.21, 0.18, 0.12, 0.10, 0.07],
+                    top_features: [['Solar Wind', 0.32], ['Proton Density', 0.21], ['IMF Bz', 0.18]],
                 });
             }
 
             setLastUpdate(new Date().toLocaleTimeString());
-        } catch (error) {
-            console.error('Error fetching prediction:', error);
+        } catch (e) {
+            console.error('Prediction fetch error', e);
             const mock = getMockPrediction();
             setPrediction(mock.prediction);
             setConditions(mock.current_conditions);
@@ -294,652 +249,373 @@ export default function PredictionDashboard({ navigation }: Props) {
 
     useEffect(() => {
         fetchData();
-        const interval = setInterval(fetchData, 120000);
-
+        const iv = setInterval(fetchData, 120000);
         Animated.parallel([
-            Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-            Animated.timing(slideAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
-            Animated.timing(gaugeAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
+            Animated.timing(fadeAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+            Animated.timing(slideAnim, { toValue: 0, duration: 700, useNativeDriver: true }),
         ]).start();
-
-        return () => clearInterval(interval);
+        return () => clearInterval(iv);
     }, [fetchData]);
 
-    const onRefresh = () => {
-        setRefreshing(true);
-        fetchData();
-    };
+    const onRefresh = () => { setRefreshing(true); fetchData(); };
 
+    /* ── Loading state ───────────────────────────────────────────── */
     if (loading) {
         return (
             <ParticleBackground>
-                <View style={styles.loadingContainer}>
+                <View style={s.loadingWrap}>
                     <ActivityIndicator size="large" color={APP_CONFIG.colors.accent} />
-                    <Text style={styles.loadingText}>Initializing Neural Network...</Text>
+                    <Text style={s.loadingText}>Initializing Neural Network...</Text>
                 </View>
             </ParticleBackground>
         );
     }
 
-    const alertColors = getAlertColor(prediction?.alert_level || 'NONE');
-    const narrativeSummary = buildNarrativeSummary(prediction, conditions, apiConnected);
-
+    const alertColors = ALERT_COLORS[prediction?.alert_level || 'NONE'] || ALERT_COLORS.NONE;
+    const summary = buildSummary(prediction, conditions, apiConnected);
     const topFi = featureImportance
         ? featureImportance.features
-            .map((name, idx) => ({ name, value: featureImportance.importance[idx] ?? 0 }))
+            .map((name, i) => ({ name, value: featureImportance.importance[i] ?? 0 }))
             .sort((a, b) => b.value - a.value)
             .slice(0, 6)
         : [];
 
+    /* ── Chart configs ───────────────────────────────────────────── */
+    const lineChartCfg = {
+        backgroundColor: CHART_BG,
+        backgroundGradientFrom: CHART_BG,
+        backgroundGradientTo: CHART_BG,
+        decimalPlaces: 0,
+        color: (o = 1) => 'rgba(0,163,255,' + o + ')',
+        labelColor: (o = 1) => 'rgba(255,255,255,' + o + ')',
+        propsForDots: { r: '3', strokeWidth: '1.5', stroke: '#00A3FF' },
+        propsForBackgroundLines: { strokeDasharray: '4,6', stroke: 'rgba(255,255,255,0.08)' },
+    };
+    const barChartCfg = {
+        backgroundColor: CHART_BG,
+        backgroundGradientFrom: CHART_BG,
+        backgroundGradientTo: CHART_BG,
+        decimalPlaces: 0,
+        color: (o = 1) => 'rgba(48,209,88,' + o + ')',
+        labelColor: (o = 1) => 'rgba(255,255,255,' + o + ')',
+        barPercentage: 0.45,
+        propsForBackgroundLines: { strokeDasharray: '4,6', stroke: 'rgba(255,255,255,0.08)' },
+    };
+    const fiChartCfg = {
+        backgroundColor: CHART_BG,
+        backgroundGradientFrom: CHART_BG,
+        backgroundGradientTo: CHART_BG,
+        decimalPlaces: 1,
+        color: (o = 1) => 'rgba(0,163,255,' + o + ')',
+        labelColor: (o = 1) => 'rgba(248,250,252,' + o + ')',
+        barPercentage: 0.55,
+        propsForBackgroundLines: { strokeDasharray: '4,6', stroke: 'rgba(255,255,255,0.08)' },
+    };
+
+    /* ── Render ──────────────────────────────────────────────────── */
     return (
         <ParticleBackground>
-            <SafeAreaView style={styles.container}>
+            <SafeAreaView style={s.container}>
                 <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
                 <ScrollView
-                    contentContainerStyle={styles.scrollContent}
+                    contentContainerStyle={s.scroll}
                     showsVerticalScrollIndicator={false}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={APP_CONFIG.colors.accent} />}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={APP_CONFIG.colors.accent} />
+                    }
                 >
-                    <Header
-                        title="CME Prediction Engine"
-                        showBackButton={true}
-                        onBackPress={() => navigation.goBack()}
-                    />
+                    <Header title="CME Prediction Engine" showBackButton onBackPress={() => navigation.goBack()} />
 
-                    {/* Narrative Summary */}
-                    <GlassCard style={styles.summaryCard}>
-                        <View style={styles.summaryHeader}>
-                            <View style={[styles.summaryDot, { backgroundColor: alertColors[0] }]} />
-                            <Text style={styles.summaryTitle}>Mission Status</Text>
+                    {/* Summary */}
+                    <GlassCard style={s.summaryCard}>
+                        <View style={s.summaryRow}>
+                            <View style={[s.dot, { backgroundColor: alertColors[0] }]} />
+                            <Text style={s.summaryTitle}>Mission Status</Text>
                         </View>
-                        <Text style={styles.summaryText}>{narrativeSummary}</Text>
+                        <Text style={s.summaryText}>{summary}</Text>
                         <SeverityBar
                             value={prediction?.cme_probability ?? 0}
                             label="CME Impact Risk"
                             gradientColors={['#30D158', '#FFD60A', '#FF3B30']}
                             legendLabels={['Low', 'Moderate', 'High']}
-                            barHeight={6}
+                            barHeight={5}
                         />
                     </GlassCard>
 
-                    {/* Status Bar */}
-                    <Animated.View style={[styles.statusBar, { opacity: fadeAnim }]}>
-                        <GlassCard style={styles.statusBlur}>
-                            <View style={styles.statusRow}>
-                                <View style={[styles.statusDot, { backgroundColor: apiConnected ? APP_CONFIG.colors.success : APP_CONFIG.colors.warning }]} />
-                                <Text style={styles.statusText}>{apiConnected ? 'ML MODEL CONNECTED' : 'DEMO MODE - DISCONNECTED'}</Text>
+                    {/* Connection status */}
+                    <Animated.View style={[s.statusBar, { opacity: fadeAnim }]}>
+                        <GlassCard style={s.statusInner}>
+                            <View style={s.statusRow}>
+                                <View style={[s.dot, { backgroundColor: apiConnected ? '#30D158' : '#FF9500' }]} />
+                                <Text style={s.statusLabel}>
+                                    {apiConnected ? 'ML MODEL CONNECTED' : 'DEMO MODE'}
+                                </Text>
                             </View>
-                            <Text style={styles.updateText}>{lastUpdate}</Text>
+                            <Text style={s.statusTime}>{lastUpdate}</Text>
                         </GlassCard>
                     </Animated.View>
 
-                    {/* Main Gauge Section */}
-                    <Animated.View style={[styles.mainSection, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-                        <View style={styles.gaugeWrapper}>
-                            <View style={[styles.gaugeRing, { borderColor: `${alertColors[0]}40` }]} />
-                            <View style={[styles.gaugeRingInner, { borderColor: `${alertColors[0]}20` }]} />
-
-                            <View style={styles.gaugeContent}>
-                                <Text style={styles.probabilityLabel}>IMPACT PROBABILITY</Text>
-                                <Text style={[styles.probabilityValue, { color: alertColors[0] }]}>
-                                    {prediction?.cme_probability.toFixed(1)}%
+                    {/* Main gauge */}
+                    <Animated.View style={[s.gaugeSection, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                        <View style={s.gaugeOuter}>
+                            <View style={[s.gaugeRing, { borderColor: alertColors[0] + '40' }]} />
+                            <View style={[s.gaugeRingInner, { borderColor: alertColors[0] + '20' }]} />
+                            <View style={s.gaugeCenter}>
+                                <Text style={s.gaugeLabel}>IMPACT PROBABILITY</Text>
+                                <Text style={[s.gaugeValue, { color: alertColors[0] }]}>
+                                    {prediction?.cme_probability.toFixed(1) ?? '-'}%
                                 </Text>
-                                <View style={[styles.alertBadge, { backgroundColor: `${alertColors[0]}30`, borderColor: alertColors[0] }]}>
-                                    <Text style={[styles.alertText, { color: alertColors[0] }]}>{prediction?.alert_level}</Text>
+                                <View style={[s.alertBadge, { backgroundColor: alertColors[0] + '30', borderColor: alertColors[0] }]}>
+                                    <Text style={[s.alertBadgeText, { color: alertColors[0] }]}>
+                                        {prediction?.alert_level || '-'}
+                                    </Text>
                                 </View>
                             </View>
                         </View>
 
-                        {/* Arrival & Confidence */}
-                        <View style={styles.predictionMeta}>
-                            <GlassCard style={styles.metaCard}>
-                                <Clock size={20} color="#FFF" />
-                                <View>
-                                    <Text style={styles.metaLabel}>ETA Arrival</Text>
-                                    <Text style={styles.metaValue}>{prediction?.arrival_time_eta || '--'}</Text>
+                        <View style={s.metaRow}>
+                            <GlassCard style={s.metaBox}>
+                                <Clock size={18} color="#FFF" />
+                                <View style={{ marginLeft: 10 }}>
+                                    <Text style={s.metaSmall}>ETA Arrival</Text>
+                                    <Text style={s.metaBig}>{prediction?.arrival_time_eta || '--'}</Text>
                                 </View>
                             </GlassCard>
-                            <GlassCard style={styles.metaCard}>
-                                <Shield size={20} color="#FFF" />
-                                <View>
-                                    <Text style={styles.metaLabel}>Confidence</Text>
-                                    <Text style={styles.metaValue}>{prediction?.confidence}%</Text>
+                            <GlassCard style={s.metaBox}>
+                                <Shield size={18} color="#FFF" />
+                                <View style={{ marginLeft: 10 }}>
+                                    <Text style={s.metaSmall}>Confidence</Text>
+                                    <Text style={s.metaBig}>{prediction?.confidence ?? '--'}%</Text>
                                 </View>
                             </GlassCard>
                         </View>
                     </Animated.View>
 
-                    {/* Live Conditions Grid */}
-                    <Text style={styles.sectionHeader}>Input Vectors (Real-time)</Text>
-                    <View style={styles.gridContainer}>
-                        <MetricCard
-                            icon={Wind}
-                            label="Solar Wind"
-                            value={conditions?.solar_wind.speed_km_s?.toFixed(0)}
-                            unit=" km/s"
-                            color={APP_CONFIG.colors.info}
-                        />
-                        <MetricCard
-                            icon={Activity}
-                            label="Density"
-                            value={conditions?.solar_wind.density_p_cm3?.toFixed(1)}
-                            unit=" p/cm³"
-                            color={APP_CONFIG.colors.success}
-                        />
-                        <MetricCard
-                            icon={Magnet}
-                            label="IMF Bz"
-                            value={conditions?.magnetic_field.bz_nT?.toFixed(1)}
-                            unit=" nT"
-                            color={APP_CONFIG.colors.accent}
-                        />
-                        <MetricCard
-                            icon={Zap}
-                            label="Storm Risk"
-                            value={conditions?.storm_potential || 'Low'}
-                            unit=""
-                            color={APP_CONFIG.colors.warning}
-                        />
+                    {/* Live conditions grid */}
+                    <Text style={s.section}>REAL-TIME INPUT VECTORS</Text>
+                    <View style={s.grid}>
+                        <MetricCard icon={Wind} label="Solar Wind" value={conditions?.solar_wind.speed_km_s?.toFixed(0)} unit=" km/s" color="#38BDF8" />
+                        <MetricCard icon={Activity} label="Density" value={conditions?.solar_wind.density_p_cm3?.toFixed(1)} unit=" p/cm3" color="#30D158" />
+                        <MetricCard icon={Magnet} label="IMF Bz" value={conditions?.magnetic_field.bz_nT?.toFixed(1)} unit=" nT" color="#00A3FF" />
+                        <MetricCard icon={Zap} label="Storm Risk" value={conditions?.storm_potential || 'Low'} unit="" color="#FF9500" />
                     </View>
 
-                    {/* Historical Trend Chart */}
-                    <Text style={styles.sectionHeader}>Probability Trend (Live)</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chartScroll}>
-                        <GlassCard style={styles.chartCard}>
-                          <ChartSafe fallbackText="Trend chart unavailable">
+                    {/* Probability trend */}
+                    <Text style={s.section}>CME PROBABILITY TREND</Text>
+                    <GlassCard style={s.chartCard}>
+                        <ChartSafe fallbackText="Trend chart unavailable">
                             <LineChart
                                 data={{
                                     labels: probHistory.labels,
-                                    datasets: [{
-                                        data: probHistory.data.length > 0 ? probHistory.data : [50],
-                                    }]
+                                    datasets: [{ data: safeData(probHistory.data, 50) }],
                                 }}
-                                width={CHART_WIDTH}
-                                height={220}
-                                yAxisLabel=""
+                                width={CHART_W}
+                                height={200}
                                 yAxisSuffix="%"
-                                chartConfig={{
-                                    backgroundColor: SAFE_CHART_BG,
-                                    backgroundGradientFrom: SAFE_CHART_BG,
-                                    backgroundGradientTo: SAFE_CHART_BG,
-                                    decimalPlaces: 0,
-                                    color: (opacity = 1) => `rgba(0,163,255,${opacity})`,
-                                    labelColor: (opacity = 1) => `rgba(255,255,255,${opacity})`,
-                                    style: { borderRadius: 16 },
-                                    propsForDots: { r: "4", strokeWidth: "2", stroke: APP_CONFIG.colors.accent }
-                                }}
+                                yAxisLabel=""
+                                chartConfig={lineChartCfg}
                                 bezier
-                                style={{ marginVertical: 8, borderRadius: 16 }}
+                                style={s.chart}
                             />
-                          </ChartSafe>
-                        </GlassCard>
-                    </ScrollView>
-
-                    {/* Solar Wind Histogram */}
-                    <Text style={styles.sectionHeader}>Solar Wind Speed (Real-time)</Text>
-                    <GlassCard style={styles.chartCard}>
-                      <ChartSafe fallbackText="Wind speed chart unavailable">
-                        <BarChart
-                            data={{
-                                labels: windHistory.labels,
-                                datasets: [{ data: windHistory.data }],
-                            }}
-                            width={CHART_WIDTH}
-                            height={220}
-                            yAxisLabel=""
-                            yAxisSuffix=" km/s"
-                            chartConfig={{
-                                backgroundColor: SAFE_CHART_BG,
-                                backgroundGradientFrom: SAFE_CHART_BG,
-                                backgroundGradientTo: SAFE_CHART_BG,
-                                decimalPlaces: 0,
-                                color: (opacity = 1) => `rgba(48,209,88,${opacity})`,
-                                labelColor: (opacity = 1) => `rgba(255,255,255,${opacity})`,
-                                barPercentage: 0.5,
-                            }}
-                            style={{ marginVertical: 8, borderRadius: 16 }}
-                        />
-                      </ChartSafe>
+                        </ChartSafe>
                     </GlassCard>
 
-                    {/* Model Performance */}
-                    <Text style={styles.sectionHeader}>Model Metrics (Bi-LSTM + Transformer)</Text>
-                    <GlassCard style={styles.modelCard}>
+                    {/* Solar wind bar chart */}
+                    <Text style={s.section}>SOLAR WIND SPEED</Text>
+                    <GlassCard style={s.chartCard}>
+                        <ChartSafe fallbackText="Wind speed chart unavailable">
+                            <BarChart
+                                data={{
+                                    labels: windHistory.labels,
+                                    datasets: [{ data: safeData(windHistory.data, 400) }],
+                                }}
+                                width={CHART_W}
+                                height={200}
+                                yAxisSuffix=" km/s"
+                                yAxisLabel=""
+                                chartConfig={barChartCfg}
+                                style={s.chart}
+                            />
+                        </ChartSafe>
+                    </GlassCard>
+
+                    {/* Model metrics */}
+                    <Text style={s.section}>MODEL METRICS (BI-LSTM + TRANSFORMER)</Text>
+                    <GlassCard style={s.metricsCard}>
                         {apiConnected ? (
-                        <View style={styles.modelGrid}>
-                            <View style={styles.modelItem}>
-                                <Text style={styles.modelValue}>{accuracy?.accuracy}%</Text>
-                                <Text style={styles.modelLabel}>Accuracy</Text>
+                            <View style={s.metricsRow}>
+                                {[
+                                    { v: (accuracy?.accuracy ?? 0) + '%', l: 'Accuracy' },
+                                    { v: (accuracy?.precision ?? 0) + '%', l: 'Precision' },
+                                    { v: (accuracy?.recall ?? 0) + '%', l: 'Recall' },
+                                    { v: '' + (accuracy?.auc_roc ?? 0), l: 'AUC-ROC' },
+                                ].map((m, i) => (
+                                    <React.Fragment key={m.l}>
+                                        {i > 0 && <View style={s.vDivider} />}
+                                        <View style={s.metricsItem}>
+                                            <Text style={s.metricsVal}>{m.v}</Text>
+                                            <Text style={s.metricsLbl}>{m.l}</Text>
+                                        </View>
+                                    </React.Fragment>
+                                ))}
                             </View>
-                            <View style={styles.verticalDivider} />
-                            <View style={styles.modelItem}>
-                                <Text style={styles.modelValue}>{accuracy?.precision}%</Text>
-                                <Text style={styles.modelLabel}>Precision</Text>
-                            </View>
-                            <View style={styles.verticalDivider} />
-                            <View style={styles.modelItem}>
-                                <Text style={styles.modelValue}>{accuracy?.recall}%</Text>
-                                <Text style={styles.modelLabel}>Recall</Text>
-                            </View>
-                            <View style={styles.verticalDivider} />
-                            <View style={styles.modelItem}>
-                                <Text style={styles.modelValue}>{accuracy?.auc_roc}</Text>
-                                <Text style={styles.modelLabel}>AUC-ROC</Text>
-                            </View>
-                        </View>
                         ) : (
-                        <View style={{alignItems:'center',paddingVertical:16}}>
-                            <Text style={{color:'rgba(255,255,255,0.5)',fontSize:14}}>Offline — connect to API for live metrics</Text>
-                        </View>
+                            <View style={{ alignItems: 'center', paddingVertical: 14 }}>
+                                <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13 }}>
+                                    Offline - connect to API for live metrics
+                                </Text>
+                            </View>
                         )}
-                        <View style={styles.modelFooter}>
-                            <Info size={14} color="rgba(255,255,255,0.5)" />
-                            <Text style={styles.modelFooterText}>
+                        <View style={s.metricsFooter}>
+                            <Info size={12} color="rgba(255,255,255,0.4)" />
+                            <Text style={s.metricsFooterText}>
                                 {apiConnected
-                                    ? `Validated on ${accuracy?.total_events_tested?.toLocaleString()} samples • ${accuracy?.validation_period}`
-                                    : 'Historical catalog: 1850-2026 • Connect backend for metrics'}
+                                    ? 'Validated on ' + (accuracy?.total_events_tested?.toLocaleString() ?? '-') + ' samples | ' + (accuracy?.validation_period ?? '1850-2026')
+                                    : 'Historical catalog: 1850-2026 | Connect backend for metrics'}
                             </Text>
                         </View>
                     </GlassCard>
 
-                    {/* Model Explainability */}
+                    {/* Feature importance */}
                     {topFi.length > 0 && (
                         <>
-                            <Text style={styles.sectionHeader}>Top Input Drivers</Text>
-                            <GlassCard style={styles.explainCard}>
-                                <View style={styles.explainHeader}>
-                                    <BarChart2 size={18} color={APP_CONFIG.colors.accent} />
-                                    <Text style={styles.explainTitle}>Feature Importance</Text>
+                            <Text style={s.section}>TOP INPUT DRIVERS</Text>
+                            <GlassCard style={s.chartCard}>
+                                <View style={s.fiHeader}>
+                                    <BarChart2 size={16} color={APP_CONFIG.colors.accent} />
+                                    <Text style={s.fiTitle}>Feature Importance</Text>
                                 </View>
-                                <ChartSafe fallbackText="Feature importance chart unavailable">
-                                <BarChart
-                                    data={{
-                                        labels: topFi.map(f => f.name.split(' ').slice(0, 2).join(' ')),
-                                        datasets: [
-                                            {
-                                                data: topFi.map(f => Number((f.value * 100).toFixed(1))),
-                                            },
-                                        ],
-                                    }}
-                                    width={CHART_WIDTH}
-                                    height={220}
-                                    yAxisLabel=""
-                                    yAxisSuffix="%"
-                                    chartConfig={{
-                                        backgroundColor: SAFE_CHART_BG,
-                                        backgroundGradientFrom: SAFE_CHART_BG,
-                                        backgroundGradientTo: SAFE_CHART_BG,
-                                        decimalPlaces: 1,
-                                        color: (opacity = 1) => `rgba(0,163,255,${opacity})`,
-                                        labelColor: (opacity = 1) => `rgba(248,250,252,${opacity})`,
-                                        barPercentage: 0.6,
-                                    }}
-                                    style={styles.explainChart}
-                                    fromZero
-                                />
+                                <ChartSafe fallbackText="Feature chart unavailable">
+                                    <BarChart
+                                        data={{
+                                            labels: topFi.map(f => f.name.length > 12 ? f.name.slice(0, 10) + '...' : f.name),
+                                            datasets: [{ data: safeData(topFi.map(f => +(f.value * 100).toFixed(1)), 0) }],
+                                        }}
+                                        width={CHART_W}
+                                        height={200}
+                                        yAxisSuffix="%"
+                                        yAxisLabel=""
+                                        chartConfig={fiChartCfg}
+                                        fromZero
+                                        style={s.chart}
+                                    />
                                 </ChartSafe>
-                                <Text style={styles.explainCaption}>
-                                    Higher bars mean the feature contributes more to today&apos;s CME risk estimate.
+                                <Text style={s.fiCaption}>
+                                    Higher bars = stronger influence on today's CME risk estimate.
                                 </Text>
                             </GlassCard>
                         </>
                     )}
 
-                    {/* Architecture Details */}
-                    <TouchableOpacity style={styles.archButton}>
-                        <GlassCard style={styles.archBlur}>
-                            <Cpu size={20} color="#FFF" />
-                            <Text style={styles.archText}>View Neural Network Architecture</Text>
-                            <Share2 size={16} color="rgba(255,255,255,0.5)" />
+                    {/* Architecture CTA */}
+                    <TouchableOpacity activeOpacity={0.8}>
+                        <GlassCard style={s.archCard}>
+                            <Cpu size={18} color="#FFF" />
+                            <Text style={s.archText}>View Neural Network Architecture</Text>
+                            <Share2 size={14} color="rgba(255,255,255,0.4)" />
                         </GlassCard>
                     </TouchableOpacity>
 
-                    <View style={{ height: 40 }} />
+                    <View style={{ height: 32 }} />
                 </ScrollView>
             </SafeAreaView>
         </ParticleBackground>
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: 'transparent',
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 18,
-    },
-    loadingText: {
-        color: APP_CONFIG.colors.text.secondary,
-        fontSize: 14,
-        letterSpacing: 1,
-    },
+/* =================================================================== */
+/* STYLES                                                              */
+/* =================================================================== */
+const s = StyleSheet.create({
+    container: { flex: 1 },
+    loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14 },
+    loadingText: { color: '#94A3B8', fontSize: 13, letterSpacing: 1 },
+
+    scroll: { paddingHorizontal: H_PAD, paddingBottom: 36 },
+
     summaryCard: {
-        marginBottom: 24,
-        padding: 18,
-        borderRadius: 18,
-        backgroundColor: APP_CONFIG.colors.background.card,
-        borderWidth: 1,
-        borderColor: APP_CONFIG.colors.border.accent,
+        padding: 16, marginBottom: 12, borderWidth: 1,
+        borderColor: 'rgba(0,163,255,0.25)', borderRadius: 16,
     },
-    summaryHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
-        gap: 8,
+    summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+    summaryTitle: { fontSize: 12, fontWeight: '700', color: '#FFF', letterSpacing: 1, textTransform: 'uppercase' },
+    summaryText: { fontSize: 12.5, color: '#94A3B8', lineHeight: 18, marginBottom: 10 },
+
+    dot: { width: 7, height: 7, borderRadius: 4 },
+
+    statusBar: { marginBottom: 16 },
+    statusInner: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)', borderRadius: 12,
     },
-    summaryDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+    statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    statusLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '700', letterSpacing: 0.5 },
+    statusTime: { fontSize: 10, color: '#64748B' },
+
+    gaugeSection: { alignItems: 'center', marginBottom: 20 },
+    gaugeOuter: { width: 200, height: 200, justifyContent: 'center', alignItems: 'center', marginBottom: 18 },
+    gaugeRing: { position: 'absolute', width: 200, height: 200, borderRadius: 100, borderWidth: 2 },
+    gaugeRingInner: { position: 'absolute', width: 180, height: 180, borderRadius: 90, borderWidth: 10, borderStyle: 'dashed' },
+    gaugeCenter: { alignItems: 'center' },
+    gaugeLabel: { fontSize: 10, color: '#94A3B8', letterSpacing: 2, marginBottom: 4 },
+    gaugeValue: { fontSize: 44, fontWeight: '200', letterSpacing: -2 },
+    alertBadge: { paddingVertical: 5, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, marginTop: 8 },
+    alertBadgeText: { fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
+
+    metaRow: { flexDirection: 'row', gap: 10, width: '100%' },
+    metaBox: {
+        flex: 1, flexDirection: 'row', alignItems: 'center', padding: 14,
+        borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     },
-    summaryTitle: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: APP_CONFIG.colors.white,
-        letterSpacing: 1,
-        textTransform: 'uppercase',
+    metaSmall: { fontSize: 9, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 },
+    metaBig: { fontSize: 15, fontWeight: '700', color: '#FFF' },
+
+    section: {
+        fontSize: 11, color: '#94A3B8', textTransform: 'uppercase',
+        letterSpacing: 1.5, marginBottom: 10, marginTop: 16, fontWeight: '600',
     },
-    summaryText: {
-        fontSize: 13,
-        color: APP_CONFIG.colors.text.secondary,
-        lineHeight: 18,
-        marginBottom: 12,
-    },
-    summaryBarBackground: {
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: 'rgba(15,23,42,0.9)',
-        overflow: 'hidden',
-    },
-    summaryBarFill: {
-        height: '100%',
-        borderRadius: 3,
-    },
-    summaryScaleRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 6,
-    },
-    summaryScaleLabel: {
-        fontSize: 10,
-        color: APP_CONFIG.colors.text.tertiary,
-    },
-    scrollContent: {
-        paddingHorizontal: 24,
-        paddingBottom: 40,
-    },
-    statusBar: {
-        marginBottom: 28,
-        borderRadius: 14,
-        overflow: 'hidden',
-    },
-    statusBlur: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingVertical: 10,
-        paddingHorizontal: 14,
-        backgroundColor: APP_CONFIG.colors.background.card,
-        borderWidth: 1,
-        borderColor: APP_CONFIG.colors.border.default,
-    },
-    statusRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-    },
-    statusDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-    },
-    statusText: {
-        fontSize: 11,
-        color: APP_CONFIG.colors.text.secondary,
-        fontWeight: '700',
-        letterSpacing: 0.5,
-    },
-    updateText: {
-        fontSize: 11,
-        color: APP_CONFIG.colors.text.tertiary,
-    },
-    mainSection: {
-        alignItems: 'center',
-        marginBottom: 36,
-    },
-    gaugeWrapper: {
-        width: 220,
-        height: 220,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 28,
-    },
-    gaugeRing: {
-        position: 'absolute',
-        width: 220,
-        height: 220,
-        borderRadius: 110,
-        borderWidth: 2,
-    },
-    gaugeRingInner: {
-        position: 'absolute',
-        width: 200,
-        height: 200,
-        borderRadius: 100,
-        borderWidth: 12,
-        borderStyle: 'dashed',
-    },
-    gaugeContent: {
-        alignItems: 'center',
-    },
-    probabilityLabel: {
-        fontSize: 11,
-        color: APP_CONFIG.colors.text.secondary,
-        letterSpacing: 2,
-        marginBottom: 6,
-    },
-    probabilityValue: {
-        fontSize: 48,
-        fontWeight: '200',
-        letterSpacing: -2,
-    },
-    alertBadge: {
-        paddingVertical: 6,
-        paddingHorizontal: 16,
-        borderRadius: 14,
-        borderWidth: 1,
-        marginTop: 10,
-    },
-    alertText: {
-        fontSize: 13,
-        fontWeight: '700',
-        letterSpacing: 1.5,
-    },
-    predictionMeta: {
-        flexDirection: 'row',
-        gap: 14,
-        width: '100%',
-    },
-    metaCard: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 18,
-        borderRadius: 18,
-        gap: 14,
-        backgroundColor: APP_CONFIG.colors.background.card,
-        borderWidth: 1,
-        borderColor: APP_CONFIG.colors.border.default,
-    },
-    metaLabel: {
-        fontSize: 10,
-        color: APP_CONFIG.colors.text.tertiary,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    metaValue: {
-        fontSize: 17,
-        fontWeight: '700',
-        color: '#FFF',
-    },
-    sectionHeader: {
-        fontSize: 12,
-        color: APP_CONFIG.colors.text.secondary,
-        textTransform: 'uppercase',
-        letterSpacing: 2,
-        marginBottom: 18,
-        marginLeft: 4,
-        fontWeight: '600',
-    },
-    gridContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 14,
-        marginBottom: 36,
-    },
+
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
     metricCard: {
-        width: (width - 62) / 2,
-        padding: 18,
-        borderRadius: 18,
-        backgroundColor: APP_CONFIG.colors.background.card,
-        borderWidth: 1,
-        borderColor: APP_CONFIG.colors.border.default,
+        width: (SCREEN_W - H_PAD * 2 - 10) / 2, padding: 14, borderRadius: 14,
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     },
-    iconContainer: {
-        width: 36,
-        height: 36,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 14,
-    },
-    metricValue: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#FFF',
-        marginBottom: 6,
-    },
-    metricUnit: {
-        fontSize: 13,
-        color: APP_CONFIG.colors.text.secondary,
-        fontWeight: '400',
-    },
-    metricLabel: {
-        fontSize: 12,
-        color: APP_CONFIG.colors.text.tertiary,
-        fontWeight: '500',
-    },
-    modelCard: {
-        padding: 22,
-        borderRadius: 22,
-        backgroundColor: APP_CONFIG.colors.background.card,
-        borderWidth: 1,
-        borderColor: APP_CONFIG.colors.border.default,
-        marginBottom: 28,
-    },
-    modelGrid: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 18,
-    },
-    modelItem: {
-        alignItems: 'center',
-    },
-    modelValue: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: APP_CONFIG.colors.accent,
-        marginBottom: 6,
-    },
-    modelLabel: {
-        fontSize: 10,
-        color: APP_CONFIG.colors.text.tertiary,
-        fontWeight: '600',
-        letterSpacing: 0.5,
-    },
-    verticalDivider: {
-        width: 1,
-        height: '80%',
-        backgroundColor: APP_CONFIG.colors.border.default,
-        alignSelf: 'center',
-    },
-    modelFooter: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        paddingTop: 18,
-        borderTopWidth: 1,
-        borderTopColor: APP_CONFIG.colors.border.subtle,
-    },
-    modelFooterText: {
-        fontSize: 11,
-        color: APP_CONFIG.colors.text.tertiary,
-    },
-    explainCard: {
-        padding: 18,
-        borderRadius: 22,
-        backgroundColor: APP_CONFIG.colors.background.card,
-        borderWidth: 1,
-        borderColor: APP_CONFIG.colors.border.default,
-        marginBottom: 28,
-    },
-    explainHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 10,
-    },
-    explainTitle: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: APP_CONFIG.colors.white,
-    },
-    explainChart: {
-        marginVertical: 8,
-        borderRadius: 16,
-    },
-    explainCaption: {
-        fontSize: 11,
-        color: APP_CONFIG.colors.text.tertiary,
-        marginTop: 8,
-    },
-    archButton: {
-        borderRadius: 18,
-        overflow: 'hidden',
-    },
-    archBlur: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 18,
-        backgroundColor: 'rgba(0, 102, 255, 0.1)',
-        borderWidth: 1,
-        borderColor: APP_CONFIG.colors.border.accent,
-        gap: 14,
-    },
-    archText: {
-        flex: 1,
-        fontSize: 15,
-        color: '#FFF',
-        fontWeight: '600',
-    },
-    chartScroll: {
-        marginBottom: 26,
-        marginHorizontal: -24, // bleed into padding
-        paddingHorizontal: 24,
-    },
+    metricIcon: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+    metricValue: { fontSize: 18, fontWeight: '700', color: '#FFF', marginBottom: 4 },
+    metricUnit: { fontSize: 12, color: '#94A3B8', fontWeight: '400' },
+    metricLabel: { fontSize: 11, color: '#64748B', fontWeight: '500' },
+
     chartCard: {
-        padding: CARD_PAD,
-        borderRadius: 22,
-        overflow: 'hidden',
-        backgroundColor: APP_CONFIG.colors.background.card,
-        borderWidth: 1,
-        borderColor: APP_CONFIG.colors.border.default,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 16, // spacing for scroll
+        padding: 12, borderRadius: 16, borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)', marginBottom: 4,
+        alignItems: 'center', overflow: 'hidden',
     },
+    chart: { borderRadius: 12 },
+
+    metricsCard: {
+        padding: 16, borderRadius: 16, borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)', marginBottom: 4,
+    },
+    metricsRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginBottom: 14 },
+    metricsItem: { alignItems: 'center', flex: 1 },
+    metricsVal: { fontSize: 18, fontWeight: '700', color: '#00A3FF', marginBottom: 4 },
+    metricsLbl: { fontSize: 9, color: '#64748B', fontWeight: '600', letterSpacing: 0.5 },
+    vDivider: { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.08)' },
+    metricsFooter: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+        paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
+    },
+    metricsFooterText: { fontSize: 10, color: '#64748B' },
+
+    fiHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, paddingHorizontal: 4 },
+    fiTitle: { fontSize: 13, fontWeight: '700', color: '#FFF' },
+    fiCaption: { fontSize: 10, color: '#64748B', marginTop: 6, paddingHorizontal: 4 },
+
+    archCard: {
+        flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 14,
+        backgroundColor: 'rgba(0,102,255,0.08)', borderWidth: 1,
+        borderColor: 'rgba(0,163,255,0.25)', gap: 12, marginTop: 12,
+    },
+    archText: { flex: 1, fontSize: 14, color: '#FFF', fontWeight: '600' },
 });
