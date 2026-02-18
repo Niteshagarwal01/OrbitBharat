@@ -5,7 +5,7 @@ import { ArrowLeft, User, Bell, Shield, Info, LogOut, ChevronRight, Mail, Github
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { APP_CONFIG } from '../utils/constants';
-import { useAuth, useUser } from '@clerk/clerk-expo';
+import { useSafeAuth as useAuth, useSafeUser as useUser } from '../utils/useClerkSafe';
 import { useAlertSettings } from '../utils/LoginFeatures';
 import ParticleBackground from '../components/ParticleBackground';
 

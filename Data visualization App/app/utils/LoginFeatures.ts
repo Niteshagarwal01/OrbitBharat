@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useUser } from '@clerk/clerk-expo';
+import { useSafeUser as useUser } from './useClerkSafe';
 import { useState, useEffect, useCallback } from 'react';
 
 // Keys for storage

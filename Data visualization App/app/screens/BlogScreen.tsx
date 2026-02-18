@@ -42,7 +42,7 @@ import ParticleBackground from '../components/ParticleBackground';
 import { getAllSpaceNews, getCurrentDateTime, SpaceBlog } from '../utils/spaceNewsFetcher';
 import { useBookmarks } from '../utils/LoginFeatures';
 import * as WebBrowser from 'expo-web-browser';
-import { useAuth } from '@clerk/clerk-expo';
+import { useSafeAuth as useAuth } from '../utils/useClerkSafe';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Blog'>;
 

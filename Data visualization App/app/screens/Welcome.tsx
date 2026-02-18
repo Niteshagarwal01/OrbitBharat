@@ -20,7 +20,7 @@ import type { RootStackParamList } from '../types/navigation';
 import { APP_CONFIG } from '../utils/constants';
 import { logger } from '../utils/logger';
 import ParticleBackground from '../components/ParticleBackground';
-import { useAuth, useOAuth, useUser } from '@clerk/clerk-expo';
+import { useSafeAuth as useAuth, useSafeOAuth as useOAuth, useSafeUser as useUser } from '../utils/useClerkSafe';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
