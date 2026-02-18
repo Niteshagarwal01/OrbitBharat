@@ -295,7 +295,6 @@ export default function GraphSimulationScreen({ navigation }: Props) {
                   style={styles.secondaryChart}
                   fromZero
                   withInnerLines={false}
-                  showValuesOnTopOfBars
                 />
               </View>
 

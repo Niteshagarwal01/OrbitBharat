@@ -161,7 +161,7 @@ export default function SettingsScreen({ navigation }: any) {
                                     icon={Github}
                                     title="Source Code"
                                     subtitle="View repository"
-                                    onPress={() => Linking.openURL('https://github.com/nitesh-agarwal/Ekip_Bhaskar_CME_Event')}
+                                    onPress={() => Linking.openURL('https://github.com/Niteshagarwal01/OrbitBharat')}
                                     color="#FFF"
                                 />
                                 <View style={styles.divider} />

@@ -58,7 +58,10 @@ const { width } = Dimensions.get('window');
 const SCROLL_PAD = 24;
 const CARD_PAD = 16;
 // Chart width = screen - (scrollContent padding + card padding) both sides
-const CHART_WIDTH = width - (SCROLL_PAD + CARD_PAD) * 2;
+const CHART_WIDTH = Math.max(width - (SCROLL_PAD + CARD_PAD) * 2, 200);
+// react-native-chart-kit crashes on Android when bg colors contain rgba() with
+// spaces or alpha.  Use a solid hex colour that approximates the card bg.
+const SAFE_CHART_BG = '#0D1117';
 
 // Alert level colors - Blue palette based
 const getAlertColor = (level: string): [string, string] => {
@@ -378,12 +381,12 @@ export default function PredictionDashboard({ navigation }: Props) {
                                 yAxisLabel=""
                                 yAxisSuffix="%"
                                 chartConfig={{
-                                    backgroundColor: APP_CONFIG.colors.background.card,
-                                    backgroundGradientFrom: APP_CONFIG.colors.background.card,
-                                    backgroundGradientTo: APP_CONFIG.colors.background.card,
+                                    backgroundColor: SAFE_CHART_BG,
+                                    backgroundGradientFrom: SAFE_CHART_BG,
+                                    backgroundGradientTo: SAFE_CHART_BG,
                                     decimalPlaces: 0,
-                                    color: (opacity = 1) => `rgba(0, 163, 255, ${opacity})`,
-                                    labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                                    color: (opacity = 1) => `rgba(0,163,255,${opacity})`,
+                                    labelColor: (opacity = 1) => `rgba(255,255,255,${opacity})`,
                                     style: { borderRadius: 16 },
                                     propsForDots: { r: "4", strokeWidth: "2", stroke: APP_CONFIG.colors.accent }
                                 }}
@@ -415,12 +418,12 @@ export default function PredictionDashboard({ navigation }: Props) {
                             yAxisLabel=""
                             yAxisSuffix=" km/s"
                             chartConfig={{
-                                backgroundColor: APP_CONFIG.colors.background.card,
-                                backgroundGradientFrom: APP_CONFIG.colors.background.card,
-                                backgroundGradientTo: APP_CONFIG.colors.background.card,
+                                backgroundColor: SAFE_CHART_BG,
+                                backgroundGradientFrom: SAFE_CHART_BG,
+                                backgroundGradientTo: SAFE_CHART_BG,
                                 decimalPlaces: 0,
-                                color: (opacity = 1) => `rgba(48, 209, 88, ${opacity})`,
-                                labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                                color: (opacity = 1) => `rgba(48,209,88,${opacity})`,
+                                labelColor: (opacity = 1) => `rgba(255,255,255,${opacity})`,
                             }}
                             style={{ marginVertical: 8, borderRadius: 16 }}
                         />
@@ -479,17 +482,16 @@ export default function PredictionDashboard({ navigation }: Props) {
                                     yAxisLabel=""
                                     yAxisSuffix="%"
                                     chartConfig={{
-                                        backgroundColor: APP_CONFIG.colors.background.card,
-                                        backgroundGradientFrom: APP_CONFIG.colors.background.card,
-                                        backgroundGradientTo: APP_CONFIG.colors.background.card,
+                                        backgroundColor: SAFE_CHART_BG,
+                                        backgroundGradientFrom: SAFE_CHART_BG,
+                                        backgroundGradientTo: SAFE_CHART_BG,
                                         decimalPlaces: 1,
-                                        color: (opacity = 1) => `rgba(0, 163, 255, ${opacity})`,
-                                        labelColor: (opacity = 1) => `rgba(248, 250, 252, ${opacity})`,
+                                        color: (opacity = 1) => `rgba(0,163,255,${opacity})`,
+                                        labelColor: (opacity = 1) => `rgba(248,250,252,${opacity})`,
                                         barPercentage: 0.6,
                                     }}
                                     style={styles.explainChart}
                                     fromZero
-                                    showValuesOnTopOfBars
                                 />
                                 <Text style={styles.explainCaption}>
                                     Higher bars mean the feature contributes more to today&apos;s CME risk estimate.
