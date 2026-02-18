@@ -35,9 +35,11 @@ import {
 } from "react-native-chart-kit";
 
 /** Lightweight error boundary that swallows chart‑rendering crashes */
-class ChartSafe extends Component<{ children: ReactNode; fallbackText?: string }, { crashed: boolean }> {
-    state = { crashed: false };
-    static getDerivedStateFromError() { return { crashed: true }; }
+interface ChartSafeProps { children: ReactNode; fallbackText?: string; }
+interface ChartSafeState { crashed: boolean; }
+class ChartSafe extends Component<ChartSafeProps, ChartSafeState> {
+    constructor(props: ChartSafeProps) { super(props); this.state = { crashed: false }; }
+    static getDerivedStateFromError(): ChartSafeState { return { crashed: true }; }
     componentDidCatch(e: Error, info: ErrorInfo) { console.warn('ChartSafe caught', e.message); }
     render() {
         if (this.state.crashed) {
@@ -200,13 +202,13 @@ export default function PredictionDashboard({ navigation }: Props) {
                 setConditions(mock.current_conditions);
                 setModelInfo(getMockModelInfo());
                 setAccuracy({
-                    accuracy: 87.3,
-                    precision: 82.1,
-                    recall: 79.4,
-                    f1_score: 80.7,
-                    auc_roc: 0.91,
-                    validation_period: '2020-2024',
-                    total_events_tested: 156,
+                    accuracy: 0,
+                    precision: 0,
+                    recall: 0,
+                    f1_score: 0,
+                    auc_roc: 0,
+                    validation_period: 'Demo Mode — connect API for real metrics',
+                    total_events_tested: 0,
                 });
 
                 // Mock feature importance in demo mode
@@ -460,8 +462,9 @@ export default function PredictionDashboard({ navigation }: Props) {
                     </GlassCard>
 
                     {/* Model Performance */}
-                    <Text style={styles.sectionHeader}>Model Metrics (Bi-LSTM)</Text>
+                    <Text style={styles.sectionHeader}>Model Metrics (Bi-LSTM + Transformer)</Text>
                     <GlassCard style={styles.modelCard}>
+                        {apiConnected ? (
                         <View style={styles.modelGrid}>
                             <View style={styles.modelItem}>
                                 <Text style={styles.modelValue}>{accuracy?.accuracy}%</Text>
@@ -483,9 +486,18 @@ export default function PredictionDashboard({ navigation }: Props) {
                                 <Text style={styles.modelLabel}>AUC-ROC</Text>
                             </View>
                         </View>
+                        ) : (
+                        <View style={{alignItems:'center',paddingVertical:16}}>
+                            <Text style={{color:'rgba(255,255,255,0.5)',fontSize:14}}>Offline — connect to API for live metrics</Text>
+                        </View>
+                        )}
                         <View style={styles.modelFooter}>
                             <Info size={14} color="rgba(255,255,255,0.5)" />
-                            <Text style={styles.modelFooterText}>Validated on {accuracy?.total_events_tested} historical events • {accuracy?.validation_period}</Text>
+                            <Text style={styles.modelFooterText}>
+                                {apiConnected
+                                    ? `Validated on ${accuracy?.total_events_tested} samples • ${accuracy?.validation_period}`
+                                    : 'Demo mode — metrics require backend connection'}
+                            </Text>
                         </View>
                     </GlassCard>
 

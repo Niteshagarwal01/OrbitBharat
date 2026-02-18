@@ -5,18 +5,20 @@
 import { fetchWithTimeout } from './fetchWithTimeout';
 
 // ─── Backend URL Configuration ───────────────────────────────
-// Priority order:
-//   1. EXPO_PUBLIC_CME_API_URL env var  (set in .env or EAS)
-//   2. Deployed Render URL              (permanent, works for APK)
-//   3. LAN IP fallback                  (local dev on same WiFi)
-//
-const DEPLOYED_URL = 'https://orbitbharat-api.onrender.com'; // Render deployment
-const LAN_URL      = 'http://192.168.1.43:8000';
+// Always prefer the deployed Render URL so APK builds work.
+// The .env / EAS env var can override for dev or staging.
+const DEPLOYED_URL = 'https://orbitbharat-api.onrender.com';
 
-const API_BASE_URL =
-    (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_CME_API_URL)
-        ? process.env.EXPO_PUBLIC_CME_API_URL
-        : DEPLOYED_URL || LAN_URL;
+// __DEV__ is true inside Metro (expo start) and false in APK builds.
+// In dev, honour the env var so you can point at a local server;
+// in production APK, always use the deployed URL.
+const API_BASE_URL: string = (() => {
+    // @ts-ignore – __DEV__ is a React-Native global
+    const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
+    const envUrl = process.env.EXPO_PUBLIC_CME_API_URL;
+    if (isDev && envUrl) return envUrl;   // local dev override
+    return DEPLOYED_URL;
+})();
 
 export interface CMEPrediction {
     cme_probability: number;
@@ -66,6 +68,13 @@ export interface AccuracyMetrics {
     auc_roc: number;
     validation_period: string;
     total_events_tested: number;
+    donki_cme_events?: number;
+    true_positives?: number;
+    false_positives?: number;
+    true_negatives?: number;
+    false_negatives?: number;
+    computed_at?: string;
+    note?: string;
 }
 
 export interface FeatureImportance {
@@ -175,27 +184,33 @@ class CMEPredictionAPI {
      * Check if API server is healthy
      */
     async healthCheck(): Promise<boolean> {
-        try {
-            console.log('[CME API] Health check to:', this.baseUrl);
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
-
-            const response = await fetch(`${this.baseUrl}/`, {
-                method: 'GET',
-                signal: controller.signal,
-            });
-            clearTimeout(timeout);
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log('[CME API] Health check response:', data);
-                return data.status === 'healthy';
+        // Render free-tier cold-starts can take 30+ seconds.
+        // Try twice: first with a generous 30 s timeout, then a quick retry.
+        const attempt = async (timeoutMs: number): Promise<boolean> => {
+            try {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), timeoutMs);
+                const response = await fetch(`${this.baseUrl}/`, {
+                    method: 'GET',
+                    signal: controller.signal,
+                });
+                clearTimeout(timer);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('[CME API] Health check OK:', data);
+                    return data.status === 'healthy';
+                }
+                return false;
+            } catch {
+                return false;
             }
-            return false;
-        } catch (error) {
-            console.log('[CME API] Health check failed:', error);
-            return false;
-        }
+        };
+
+        console.log('[CME API] Health check to:', this.baseUrl);
+        // 1st attempt – long timeout covers Render cold-start
+        if (await attempt(30_000)) return true;
+        // 2nd attempt – server may have just woken up
+        return attempt(10_000);
     }
 }
 

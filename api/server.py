@@ -172,8 +172,19 @@ async def get_model_info():
         'data_source': 'DSCOVR Satellite at L1 (NOAA SWPC)',
         'developer': 'Nitesh Agarwal',
         'version': '2.0.0',
-        'last_updated': '2026-02-06'
+        'last_updated': datetime.now().strftime('%Y-%m-%d'),
+        'validation_source': 'NASA DONKI CME Catalog (2015-present)',
     }
+
+
+@app.get("/api/accuracy/refresh")
+async def refresh_accuracy():
+    """Force recompute of accuracy metrics (clears cache)."""
+    if predictor is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    predictor._accuracy_cache = None
+    predictor._accuracy_cache_time = None
+    return predictor.get_historical_accuracy()
 
 
 @app.get("/api/data/realtime")
