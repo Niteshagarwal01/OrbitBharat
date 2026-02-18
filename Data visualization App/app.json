@@ -33,25 +33,11 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-font"
     ],
     "scheme": "orbitbharat",
     "description": "OrbitBharat - Advanced Space Weather Monitoring & Satellite Tracking System for India's Space Ecosystem",
-    "keywords": [
-      "space",
-      "weather",
-      "cme",
-      "solar",
-      "aditya-l1",
-      "navic",
-      "isro",
-      "satellite",
-      "tracking",
-      "ai",
-      "machine-learning"
-    ],
-    "author": "Nitesh Agarwal",
-    "privacy": "public",
     "extra": {
       "router": {},
       "eas": {
