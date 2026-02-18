@@ -7,21 +7,16 @@ import { fetchWithTimeout } from './fetchWithTimeout';
 // ─── Backend URL Configuration ───────────────────────────────
 // Priority order:
 //   1. EXPO_PUBLIC_CME_API_URL env var  (set in .env or EAS)
-//   2. ngrok / public URL               (for sharing with friends)
+//   2. Deployed Render URL              (permanent, works for APK)
 //   3. LAN IP fallback                  (local dev on same WiFi)
 //
-// 👉  To share with a friend via ngrok:
-//     1. Run:  ngrok http 8000
-//     2. Paste the https://xxxx.ngrok-free.app URL below as NGROK_URL
-//     3. Rebuild / restart the app
-//
-const NGROK_URL = 'https://e941-103-3-207-247.ngrok-free.app'; // public tunnel URL
-const LAN_URL   = 'http://192.168.1.43:8000';
+const DEPLOYED_URL = 'https://orbitbharat-api.onrender.com'; // Render deployment
+const LAN_URL      = 'http://192.168.1.43:8000';
 
 const API_BASE_URL =
     (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_CME_API_URL)
         ? process.env.EXPO_PUBLIC_CME_API_URL
-        : NGROK_URL || LAN_URL;
+        : DEPLOYED_URL || LAN_URL;
 
 export interface CMEPrediction {
     cme_probability: number;
