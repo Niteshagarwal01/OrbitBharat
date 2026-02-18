@@ -17,6 +17,9 @@
             "distribution": "internal",
             "android": {
                 "buildType": "apk"
+            },
+            "env": {
+                "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_dG9sZXJhbnQtYm9iY2F0LTcyLmNsZXJrLmFjY291bnRzLmRldiQ"
             }
         },
         "production": {

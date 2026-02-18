@@ -4,8 +4,10 @@
 import * as SecureStore from 'expo-secure-store';
 
 // Clerk API Keys - loaded from environment variables
-export const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
-if (!CLERK_PUBLISHABLE_KEY) console.warn('EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is not set');
+// Publishable keys are safe for client-side use (designed to be public)
+export const CLERK_PUBLISHABLE_KEY =
+    process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+    'pk_test_dG9sZXJhbnQtYm9iY2F0LTcyLmNsZXJrLmFjY291bnRzLmRldiQ';
 
 // Token cache for Clerk (persists auth state)
 export const tokenCache = {
