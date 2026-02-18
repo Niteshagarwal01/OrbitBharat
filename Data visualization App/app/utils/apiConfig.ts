@@ -5,7 +5,7 @@ export const API_CONFIG = {
   // Google Custom Search API
   GOOGLE_SEARCH: {
     API_KEY: process.env.EXPO_PUBLIC_GOOGLE_SEARCH_API_KEY || '',
-    SEARCH_ENGINE_ID: process.env.EXPO_PUBLIC_GOOGLE_SEARCH_ENGINE_ID || ''},
+    SEARCH_ENGINE_ID: process.env.EXPO_PUBLIC_GOOGLE_SEARCH_ENGINE_ID || '',
     BASE_URL: 'https://www.googleapis.com/customsearch/v1',
   },
   

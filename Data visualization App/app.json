@@ -51,6 +51,13 @@
       "machine-learning"
     ],
     "author": "Nitesh Agarwal",
-    "privacy": "public"
+    "privacy": "public",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "524ced0a-7340-4fee-ae4e-ecc827a4a67b"
+      }
+    },
+    "owner": "nitesh482006"
   }
 }
